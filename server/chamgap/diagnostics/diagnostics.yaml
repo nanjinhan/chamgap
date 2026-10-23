@@ -1,0 +1,53 @@
+# 참값 진단 기준값 (DX-03) — 지시서 6.3절의 시작값. 시험하며 조정한다.
+# 고친 뒤 서버 재시작 없이: POST /api/diagnostics/reload
+#
+# 공통 키
+#   hold_s   : 조건이 이만큼 이어져야 켜짐 (DX-02)
+#   clear_s  : 정상이 이만큼 이어져야 꺼짐 (없으면 hold_s, 최소 min_clear_s)
+#   window_s : 시간 창 규칙(*_STUCK, LC_DRIFT_UP, MSG_GAP)의 창 길이. 창 자체가 유지 시간이다
+#   show_s   : 사건 규칙(재시작·거부·급수 결과)을 보여 주는 시간
+# mock 모드에서 --mock-speed N이면 hold_s·clear_s·window_s는 1/N로 줄어든다 (시연용)
+
+defaults:
+  min_clear_s: 10
+
+rules:
+  NODE_OFFLINE:      { factor: 3, min_s: 15, clear_s: 0 }      # 마지막 data 후 3 × sample_ms (최소 15초)
+  NODE_REBOOTED:     { show_s: 300, ignore_after_open_s: 15 }  # 포트를 연 직후의 boot는 정상으로 본다
+  MSG_GAP:           { window_s: 600, count: 3, weak_rssi: -75 }
+
+  SHT_NO_RESP:       { hold_s: 15 }
+  SHT_RANGE:         { hold_s: 0, temp_min: -10, temp_max: 60, rh_min: 0, rh_max: 100 }
+  SHT_AB_DIFF:       { hold_s: 600, temp_diff: 1.0, rh_diff: 5.0 }
+  SHT_STUCK:         { window_s: 1800, max_change: 0.02 }
+
+  SOIL_WIRE:         { hold_s: 15, mv_low: 150, mv_high: 3050 }
+  SOIL_UNCAL:        {}
+  SOIL_AB_DIFF:      { hold_s: 600, max_diff: 0.25 }
+  SOIL_NO_RISE:      { show_s: 3600 }                          # 판정 기준은 아래 water:
+  SOIL_STUCK:        { window_s: 21600, max_change_mv: 10 }
+
+  LC_NO_RESP:        { hold_s: 15 }
+  LC_UNCAL:          {}
+  LC_NOISY:          { hold_s: 120, max_sd_g: 5 }
+  LC_NEGATIVE:       { hold_s: 60, min_g: -50 }
+  LC_OVERLOAD:       { hold_s: 0, max_g: 7000 }
+  LC_DRIFT_UP:       { window_s: 3600, rise_g: 20 }
+
+  WATER_NOT_ARRIVED: { show_s: 3600 }
+  WATER_OVER:        { show_s: 3600 }
+  PUMP_REFUSED:      { show_s: 120 }
+  FLOW_UNCAL:        {}
+
+  V12_MISSING:       { hold_s: 3, min_v: 9.0 }
+  LEAK:              { hold_s: 0 }
+
+# 급수 추적 (WATER_NOT_ARRIVED · WATER_OVER · SOIL_NO_RISE). 물 1mL = 1g
+water:
+  window_s: 120        # pump_off(done) 뒤 무게를 보는 시간
+  settle_s: 30         # 정상 판정을 이보다 일찍 내리지 않는다
+  stable_sd_g: 3       # 흔들림이 이 이하인 값끼리만 비교
+  arrive_ratio: 0.5    # 증가량 < 예상의 50% → 도착 안 함
+  over_ratio: 1.5      # 증가량 > 예상의 150% → 너무 많음
+  soil_window_s: 900   # 급수 뒤 15분 안에
+  soil_min_rise: 0.02  # 수분이 이만큼은 올라야 정상

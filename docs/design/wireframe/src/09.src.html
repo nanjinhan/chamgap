@@ -1,0 +1,65 @@
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans','Noto Sans KR',sans-serif;color:#18213a}
+.cap{font-size:11.5px;font-weight:700;color:#2b3550;margin-bottom:8px}
+.cap code{font-family:'JetBrains Mono',monospace;font-size:11px;background:#fff;border-radius:6px;padding:1px 6px;color:#2456d6}
+.isl{background:#0b0f1a;color:#fff;margin:0 auto}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%}
+</style>
+
+<x-dc>
+<helmet>
+
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans','Noto Sans KR',sans-serif;color:#18213a}
+.cap{font-size:11.5px;font-weight:700;color:#2b3550;margin-bottom:8px}
+.cap code{font-family:'JetBrains Mono',monospace;font-size:11px;background:#fff;border-radius:6px;padding:1px 6px;color:#2456d6}
+.isl{background:#0b0f1a;color:#fff;margin:0 auto}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:linear-gradient(170deg,#f4f8ff 0%,#dbe8ff 60%,#c2d8ff 100%);padding:26px 20px;display:flex;flex-direction:column;gap:26px">
+
+  <div>
+    <div class="cap"><code>compact</code> 평소 · 모두 정상</div>
+    <div class="isl" style="width:170px;height:34px;border-radius:999px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;font-weight:600"><span class="dot" style="background:#3ddc84"></span>3구역 연결</div>
+  </div>
+
+  <div>
+    <div class="cap"><code>compactLong</code> 주의 1건 이상 (가장 나쁜 것)</div>
+    <div class="isl" style="width:300px;height:36px;border-radius:999px;display:flex;align-items:center;gap:8px;padding:0 14px;box-sizing:border-box;font-size:12px;font-weight:600"><span class="dot" style="background:#ffb347"></span>Z1 온습도 B 주의<span style="margin-left:auto;opacity:.7">+2.7°C</span></div>
+  </div>
+
+  <div>
+    <div class="cap"><code>large</code> 급수 중 · 정지 버튼 항상 포함</div>
+    <div class="isl" style="width:350px;height:88px;border-radius:30px;padding:14px 16px;box-sizing:border-box;display:flex;align-items:center;gap:12px">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:700">Z1 급수 중 · 10mL</div>
+        <div style="height:6px;border-radius:3px;background:#2a3350;margin-top:8px"><div style="width:62%;height:6px;border-radius:3px;background:#5b8cff"></div></div>
+        <div style="font-size:11px;opacity:.7;margin-top:6px">1.6초 남음 · 무게 +6.1g</div>
+      </div>
+      <button style="width:52px;height:52px;border-radius:50%;border:0;background:#e5484d;color:#fff;font-family:inherit;font-weight:700;font-size:12px">정지</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="cap"><code>tall</code> 새 고장 알림 · 6초 뒤 compactLong 으로</div>
+    <div class="isl" style="width:350px;border-radius:32px;padding:16px;box-sizing:border-box">
+      <div style="display:flex;gap:8px;align-items:center"><span style="font-size:11px;font-weight:700;background:#e5484d;border-radius:999px;padding:2px 9px">고장</span><span style="font-size:11px;opacity:.7">Z2 · 토양 A</span></div>
+      <div style="font-size:15px;font-weight:800;margin-top:8px">토양 A 신호선 빠짐 의심</div>
+      <div style="font-size:12px;opacity:.75;margin-top:2px">12mV · 3선 중 A(신호)선을 확인하세요</div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button style="flex:1;height:38px;border-radius:12px;border:0;background:#2f6bff;color:#fff;font-family:inherit;font-weight:700;font-size:12.5px">자세히</button>
+        <button style="flex:1;height:38px;border-radius:12px;border:0;background:#2a3350;color:#fff;font-family:inherit;font-weight:700;font-size:12.5px">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="cap"><code>minimalLeading</code> 서버 연결 끊김</div>
+    <div class="isl" style="width:220px;height:34px;border-radius:999px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;font-weight:600"><span class="dot" style="background:#e5484d"></span>서버 끊김 · 다시 연결 중</div>
+  </div>
+</div>
+</x-dc>
+
+
+

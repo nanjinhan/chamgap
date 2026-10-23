@@ -1,0 +1,82 @@
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans','Noto Sans KR',sans-serif;color:#18213a}
+a{color:inherit;text-decoration:none}a:hover{color:#2f6bff}
+.card{background:#fff;border-radius:22px;box-shadow:0 10px 28px rgba(40,90,180,.12)}
+.row{display:flex;gap:10px;align-items:center;font-size:12.5px;padding:6px 0}
+.ok{width:20px;height:20px;border-radius:50%;background:#e3f5ea;display:flex;align-items:center;justify-content:center;flex:none}
+input[type=range]{width:100%;accent-color:#2f6bff;height:24px;margin:0}
+</style>
+
+<x-dc>
+<helmet>
+
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans','Noto Sans KR',sans-serif;color:#18213a}
+a{color:inherit;text-decoration:none}a:hover{color:#2f6bff}
+.card{background:#fff;border-radius:22px;box-shadow:0 10px 28px rgba(40,90,180,.12)}
+.row{display:flex;gap:10px;align-items:center;font-size:12.5px;padding:6px 0}
+.ok{width:20px;height:20px;border-radius:50%;background:#e3f5ea;display:flex;align-items:center;justify-content:center;flex:none}
+input[type=range]{width:100%;accent-color:#2f6bff;height:24px;margin:0}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:linear-gradient(170deg,#f4f8ff 0%,#dbe8ff 60%,#c2d8ff 100%);position:relative;overflow:hidden;padding:14px 20px 0">
+
+  <div style="display:flex;justify-content:center">
+    <div style="background:#0b0f1a;color:#fff;border-radius:999px;height:34px;padding:0 14px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600">
+      <span style="width:8px;height:8px;border-radius:50%;background:#3ddc84"></span>3구역 연결
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
+    <a href="Main.dc.html" aria-label="뒤로" style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="#18213a" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></a>
+    <div style="font-size:17px;font-weight:800">급수</div>
+    <span style="width:40px"></span>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-top:12px" role="tablist" aria-label="구역">
+    <button role="tab" aria-selected="true" style="border:0;border-radius:999px;padding:8px 18px;background:#2f6bff;color:#fff;font-weight:700;font-size:13px;font-family:inherit">Z1</button>
+    <button role="tab" aria-selected="false" style="border:0;border-radius:999px;padding:8px 18px;background:#fff;color:#18213a;font-weight:600;font-size:13px;font-family:inherit">Z2</button>
+    <button role="tab" aria-selected="false" style="border:0;border-radius:999px;padding:8px 18px;background:#fff;color:#18213a;font-weight:600;font-size:13px;font-family:inherit">Z3</button>
+  </div>
+
+  <div style="display:flex;justify-content:center;margin-top:16px">
+    <div style="width:170px;height:170px;border-radius:50%;background:#fff;box-shadow:0 10px 28px rgba(40,90,180,.16);position:relative;overflow:hidden">
+      <div style="position:absolute;left:0;right:0;bottom:0;height:34%;background:linear-gradient(180deg,#8cb8ff,#2f6bff);border-radius:46% 54% 0 0 / 14px 14px 0 0"></div>
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+        <div style="font-size:40px;font-weight:800;color:#18213a">10<span style="font-size:18px"> mL</span></div>
+        <div style="font-size:11.5px;color:#4f5b76;font-weight:600">약 4.3초 · 2.35 mL/s</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px;padding:12px 14px">
+    <label for="ml" style="font-size:12.5px;font-weight:700">급수량</label>
+    <div style="position:relative;height:26px;margin-top:4px">
+      <div style="position:absolute;left:18%;transform:translateX(-50%);background:#2f6bff;color:#fff;font-size:11px;font-weight:700;border-radius:8px;padding:3px 8px">10 mL</div>
+    </div>
+    <input id="ml" type="range" min="0" max="50" step="5" value="10">
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:#5f6b85"><span>0</span><span>1회 최대 50</span></div>
+  </div>
+
+  <div class="card" style="margin-top:12px;padding:10px 14px">
+    <div style="font-size:12.5px;font-weight:700;margin-bottom:2px">켜기 전 점검</div>
+    <div class="row"><span class="ok"><svg width="12" height="12" sc-camel-view-box="0 0 24 24" fill="none" stroke="#16834a" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span>Z1 연결됨 · 펌프 꺼짐</div>
+    <div class="row"><span class="ok"><svg width="12" height="12" sc-camel-view-box="0 0 24 24" fill="none" stroke="#16834a" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span>12V 12.0V · 누수 없음</div>
+    <div class="row"><span class="ok"><svg width="12" height="12" sc-camel-view-box="0 0 24 24" fill="none" stroke="#16834a" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span>로드셀 응답 · 흔들림 0.4g</div>
+    <div class="row"><span class="ok"><svg width="12" height="12" sc-camel-view-box="0 0 24 24" fill="none" stroke="#16834a" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span>오늘 30 / 300 mL</div>
+  </div>
+
+  <button aria-label="1초 길게 눌러 Z1에 10mL 급수" style="margin-top:14px;width:100%;height:56px;border-radius:18px;border:0;background:#2f6bff;color:#fff;font-family:inherit;font-weight:800;font-size:15px;position:relative;overflow:hidden;box-shadow:0 10px 24px rgba(47,107,255,.35)">
+    <span style="position:absolute;left:0;top:0;bottom:0;width:35%;background:rgba(255,255,255,.18)"></span>
+    <span style="position:relative">길게 눌러 급수 (1초)</span>
+  </button>
+
+  <div style="margin-top:12px;font-size:12px;color:#2b3550;background:rgba(255,255,255,.7);border-radius:14px;padding:9px 12px">
+    지난 급수: 10mL 예상 → <b>+9.6g 도착</b> · 정상 (42분 전)
+  </div>
+  <div style="font-size:11px;color:#4f5b76;text-align:center;margin-top:8px">하드웨어 비상정지 스위치가 이 화면보다 항상 우선입니다</div>
+</div>
+</x-dc>
+
+
+

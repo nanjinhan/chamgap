@@ -1,0 +1,25 @@
+# Python (server)
+server/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+server/logs/
+server/data/
+server/config.yaml
+
+# Web
+web/node_modules/
+web/dist/
+web/.env
+web/.env.*
+!web/.env.example
+
+# 펌웨어 비밀값 (WiFi 비밀번호, Supabase 키)
+firmware/**/secrets.h
+
+# OS·편집기
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/

@@ -1,0 +1,109 @@
+/* 참값 디자인 토큰 (팀 시안: 연하늘 그라데이션 위의 흰 둥근 카드, 파란 포인트)
+   이번 버전은 밝은 테마만 만든다. 색은 흰 배경에서 글자 대비 4.5:1 이상. */
+
+:root {
+  --bg: linear-gradient(165deg, #eef5ff 0%, #c9defe 55%, #9fc2ff 100%);
+  --bg-sub: linear-gradient(170deg, #f4f8ff 0%, #dbe8ff 60%, #c2d8ff 100%); /* 하위 화면 (와이어프레임 02~07) */
+  --bg-flat: #eef5ff;
+  --surface: #ffffff;
+  --surface-2: #f4f8ff;
+  --primary-brand: #2f6bff;
+  --primary-soft: #e8efff;
+  --ink: #18213a;
+  --ink-2: #4f5b76;
+  --line: #eef1f7;
+  --island: #0b0f1a;
+
+  --ok: #16834a;
+  --ok-soft: #e3f5ea;
+  --info: #2456d6;
+  --info-soft: #e8efff;
+  --warn: #b45309;
+  --warn-soft: #fff1e0;
+  --warn-dot: #e8890c;
+  --fault: #b4233a;
+  --fault-soft: #fde8eb;
+  --fault-dot: #d6334a;
+  --warn-line: #f2a65a; /* 주의 카드 테두리 (와이어프레임) */
+  --fault-line: #e46a7b; /* 고장 카드 테두리 (와이어프레임) */
+  --icon-bg: #eef3ff; /* 센서 아이콘 원 */
+  --ink-3: #5f6b85; /* '대상'·'비교' 같은 보조 글자 */
+  --offline: #6b7280;
+  --offline-soft: #eef0f3;
+
+  --radius-card: 22px;
+  --radius-btn: 16px;
+  --shadow-card: 0 10px 28px rgba(40, 90, 180, 0.12);
+  --shadow-float: 0 14px 36px rgba(24, 33, 58, 0.22);
+
+  /* 레이아웃 */
+  --tabbar-h: 64px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+
+  /* shadcn 변수를 시안 색에 맞춘다 */
+  --background: #eef5ff;
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--primary-brand);
+  --primary-foreground: #ffffff;
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--ink);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--ink-2);
+  --accent: var(--primary-soft);
+  --accent-foreground: var(--ink);
+  --destructive: var(--fault);
+  --border: var(--line);
+  --input: #dfe5f1;
+  --ring: var(--primary-brand);
+  --radius: 0.75rem;
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --radius-card: 24px;
+  }
+}
+
+@theme inline {
+  /* 와이어프레임과 같은 글꼴: 숫자·영문 Plus Jakarta Sans, 한글 Noto Sans KR */
+  --font-sans:
+    'Plus Jakarta Sans Variable', 'Noto Sans KR Variable', 'Noto Sans KR', system-ui, -apple-system, 'Segoe UI',
+    sans-serif;
+  --font-heading: var(--font-sans);
+  --font-mono: ui-monospace, 'Cascadia Mono', Consolas, 'D2Coding', monospace;
+
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-brand: var(--primary-brand);
+  --color-primary-soft: var(--primary-soft);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-line: var(--line);
+  --color-island: var(--island);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-dot: var(--warn-dot);
+  --color-fault: var(--fault);
+  --color-fault-soft: var(--fault-soft);
+  --color-fault-dot: var(--fault-dot);
+  --color-warn-line: var(--warn-line);
+  --color-fault-line: var(--fault-line);
+  --color-icon-bg: var(--icon-bg);
+  --color-ink-3: var(--ink-3);
+  --color-offline: var(--offline);
+  --color-offline-soft: var(--offline-soft);
+
+  --radius-card: var(--radius-card);
+  --radius-btn: var(--radius-btn);
+  --shadow-card: var(--shadow-card);
+  --shadow-float: var(--shadow-float);
+}

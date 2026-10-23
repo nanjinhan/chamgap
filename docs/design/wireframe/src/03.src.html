@@ -1,0 +1,81 @@
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans','Noto Sans KR',sans-serif;color:#18213a}
+a{color:inherit;text-decoration:none}a:hover{color:#2f6bff}
+.card{background:#fff;border-radius:22px;box-shadow:0 10px 28px rgba(40,90,180,.12)}
+.chk{display:flex;gap:10px;align-items:flex-start;font-size:12.5px;line-height:1.45;padding:7px 0;border-top:1px solid #eef1f7}
+.chk input{width:18px;height:18px;margin:1px 0 0;accent-color:#2f6bff;flex:none}
+</style>
+
+<x-dc>
+<helmet>
+
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans','Noto Sans KR',sans-serif;color:#18213a}
+a{color:inherit;text-decoration:none}a:hover{color:#2f6bff}
+.card{background:#fff;border-radius:22px;box-shadow:0 10px 28px rgba(40,90,180,.12)}
+.chk{display:flex;gap:10px;align-items:flex-start;font-size:12.5px;line-height:1.45;padding:7px 0;border-top:1px solid #eef1f7}
+.chk input{width:18px;height:18px;margin:1px 0 0;accent-color:#2f6bff;flex:none}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:linear-gradient(170deg,#f4f8ff 0%,#dbe8ff 60%,#c2d8ff 100%);position:relative;overflow:hidden;padding:14px 20px 0">
+
+  <div style="display:flex;justify-content:center">
+    <div style="background:#0b0f1a;color:#fff;border-radius:999px;height:34px;padding:0 14px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600">
+      <span style="width:8px;height:8px;border-radius:50%;background:#3ddc84"></span>3구역 연결
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
+    <a href="Zone.dc.html" aria-label="뒤로" style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="#18213a" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></a>
+    <div style="text-align:center">
+      <div style="font-size:17px;font-weight:800">온습도 B</div>
+      <div style="font-size:11.5px;color:#5f6b85">Z1 · 비교 센서 · 0x45</div>
+    </div>
+    <span style="width:40px"></span>
+  </div>
+
+  <div class="card" style="margin-top:14px;padding:14px;outline:2px solid #f2a65a">
+    <div style="display:flex;gap:8px;align-items:center">
+      <span style="font-size:11px;font-weight:700;color:#b45309;background:#fff1e0;border-radius:999px;padding:3px 10px">주의</span>
+      <span style="font-size:11px;color:#5f6b85">10분째 · SHT_AB_DIFF</span>
+    </div>
+    <div style="font-size:17px;font-weight:800;margin-top:8px">온습도 A·B 차이가 큼</div>
+    <div style="font-size:13px;color:#4f5b76;margin-top:2px">B가 A보다 2.7°C 높음 (기준 1.0°C)</div>
+    <svg width="100%" height="84" sc-camel-view-box="0 0 320 84" sc-camel-preserve-aspect-ratio="none" role="img" aria-label="최근 1시간 A와 B 온도. A는 23도대로 일정하고 B는 23.5도에서 26.1도로 올라감" style="display:block;margin-top:10px">
+      <rect x="0" y="40" width="320" height="16" fill="#eef3ff"></rect>
+      <path d="M0 48 L40 47 L80 48 L120 46 L160 47 L200 46 L240 47 L280 46 L320 47" fill="none" stroke="#2f6bff" stroke-width="2.5"></path>
+      <path d="M0 45 L40 42 L80 38 L120 33 L160 28 L200 23 L240 19 L280 16 L320 14" fill="none" stroke="#e8890c" stroke-width="2.5" stroke-dasharray="5 4"></path>
+    </svg>
+    <div style="display:flex;gap:14px;font-size:11px;color:#5f6b85;margin-top:4px">
+      <span><span style="display:inline-block;width:14px;height:3px;background:#2f6bff;vertical-align:middle"></span> A 대상</span>
+      <span><span style="display:inline-block;width:14px;height:3px;background:#e8890c;vertical-align:middle"></span> B 비교</span>
+      <span><span style="display:inline-block;width:10px;height:8px;background:#eef3ff;vertical-align:middle"></span> 허용 범위</span>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px;padding:12px 14px">
+    <div style="font-size:13px;font-weight:800">왜 의심되나요</div>
+    <ol style="margin:6px 0 0;padding-left:18px;font-size:12.5px;line-height:1.6;color:#2b3550">
+      <li>B 근처에 열원(전장함·조명·햇빛)이 있음</li>
+      <li>A·B 높이나 통풍이 다름</li>
+      <li>B 센서 자체 고장</li>
+    </ol>
+  </div>
+
+  <div class="card" style="margin-top:12px;padding:12px 14px 6px">
+    <div style="font-size:13px;font-weight:800;margin-bottom:4px">이렇게 확인하세요</div>
+    <label class="chk"><input type="checkbox">A와 B를 서로 바꿔 끼우고 5분 뒤 차이가 따라가는지 봅니다</label>
+    <label class="chk"><input type="checkbox">거치대 높이가 같은지, 전장함 열이 닿는지 확인합니다</label>
+    <label class="chk"><input type="checkbox">둘 다 같은 컵 안에 넣어 5분 두고 차이를 다시 봅니다</label>
+  </div>
+
+  <div style="display:flex;gap:10px;margin-top:14px">
+    <button style="flex:1;height:46px;border-radius:14px;border:0;background:#fff;color:#18213a;font-family:inherit;font-weight:700;font-size:13.5px">메모 남기기</button>
+    <a href="History.dc.html" style="flex:1;height:46px;border-radius:14px;background:#2f6bff;color:#fff;font-weight:700;font-size:13.5px;display:flex;align-items:center;justify-content:center">기록에서 보기</a>
+  </div>
+  <div style="font-size:11px;color:#4f5b76;text-align:center;margin-top:10px">지금 값 26.1°C · 40.2% · 2초 전 · 응답 100%</div>
+</div>
+</x-dc>
+
+
+

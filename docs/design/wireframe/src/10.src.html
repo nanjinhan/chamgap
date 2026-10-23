@@ -1,0 +1,90 @@
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans','Noto Sans KR',sans-serif;color:#18213a}
+a{color:inherit;text-decoration:none}a:hover{color:#2f6bff}
+.card{background:#fff;border-radius:24px;box-shadow:0 12px 32px rgba(40,90,180,.12);padding:18px}
+.tag{font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 10px}
+.mini{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}
+.mini div{background:#f4f8ff;border-radius:12px;padding:8px 10px}
+.mini span{display:block;font-size:11px;color:#5f6b85}
+.mini b{font-size:16px}
+.dx{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid #eef1f7;font-size:13px}
+</style>
+
+<x-dc>
+<helmet>
+
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans','Noto Sans KR',sans-serif;color:#18213a}
+a{color:inherit;text-decoration:none}a:hover{color:#2f6bff}
+.card{background:#fff;border-radius:24px;box-shadow:0 12px 32px rgba(40,90,180,.12);padding:18px}
+.tag{font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 10px}
+.mini{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}
+.mini div{background:#f4f8ff;border-radius:12px;padding:8px 10px}
+.mini span{display:block;font-size:11px;color:#5f6b85}
+.mini b{font-size:16px}
+.dx{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid #eef1f7;font-size:13px}
+</style>
+</helmet>
+<div style="min-height:860px;background:linear-gradient(165deg,#eef5ff 0%,#cfe1ff 55%,#a9c9ff 100%);padding:20px 24px 32px;box-sizing:border-box">
+<div style="max-width:1280px;margin:0 auto">
+
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+    <div>
+      <div style="font-size:22px;font-weight:800">참값 센서 진단</div>
+      <div style="font-size:13px;color:#4f5b76">이 값을 믿어도 될까? · 3구역 시험장</div>
+    </div>
+    <div style="background:#0b0f1a;color:#fff;border-radius:999px;height:38px;padding:0 18px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600">
+      <span style="width:8px;height:8px;border-radius:50%;background:#ff6b7f"></span>Z2 토양 A 고장<span style="opacity:.5">|</span>주의 2
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span style="font-size:12.5px;color:#2b3550;background:rgba(255,255,255,.7);border-radius:999px;padding:7px 12px">USB · COM5·COM6·COM7</span>
+      <button style="height:42px;border-radius:999px;border:0;background:#d6334a;color:#fff;padding:0 18px;font-family:inherit;font-weight:800;font-size:13.5px;box-shadow:0 8px 20px rgba(214,51,74,.3)">모두 정지</button>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:20px">
+    <a href="Zone.dc.html" class="card" style="display:block;outline:2px solid #f2a65a">
+      <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:18px;font-weight:800">Z1</div><span class="tag" style="background:#fff1e0;color:#b45309">주의 1</span></div>
+      <div class="mini"><div><span>온도 A</span><b>23.4°</b></div><div><span>습도 A</span><b>45%</b></div><div><span>토양 A</span><b>0.53</b></div><div><span>무게</span><b>1,234g</b></div></div>
+      <div style="font-size:12.5px;color:#b45309;margin-top:10px;font-weight:600">온습도 B가 A보다 2.7°C 높음</div>
+    </a>
+    <a href="Zone.dc.html" class="card" style="display:block;outline:2px solid #e46a7b">
+      <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:18px;font-weight:800">Z2</div><span class="tag" style="background:#fde8eb;color:#b4233a">고장 1</span></div>
+      <div class="mini"><div><span>온도 A</span><b>23.1°</b></div><div><span>습도 A</span><b>47%</b></div><div><span>토양 A</span><b style="color:#b4233a">--</b></div><div><span>무게</span><b>1,180g</b></div></div>
+      <div style="font-size:12.5px;color:#b4233a;margin-top:10px;font-weight:600">토양 A 신호선 빠짐 의심 (12mV)</div>
+    </a>
+    <a href="Zone.dc.html" class="card" style="display:block">
+      <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:18px;font-weight:800">Z3</div><span class="tag" style="background:#fff1e0;color:#b45309">주의 1</span></div>
+      <div class="mini"><div><span>온도 A</span><b>23.6°</b></div><div><span>습도 A</span><b>44%</b></div><div><span>토양 A</span><b>0.48</b></div><div><span>무게</span><b>1,301g</b></div></div>
+      <div style="font-size:12.5px;color:#b45309;margin-top:10px;font-weight:600">무게 흔들림 8.2g</div>
+    </a>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:16px">
+    <div class="card" style="flex:999 1 560px;min-width:0">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div style="font-size:15px;font-weight:800">Z1 무게 · 6시간</div>
+        <div style="display:flex;gap:6px">
+          <span class="tag" style="background:#eef3ff;color:#2456d6">온도</span><span class="tag" style="background:#eef3ff;color:#2456d6">습도</span><span class="tag" style="background:#eef3ff;color:#2456d6">토양</span><span class="tag" style="background:#18213a;color:#fff">무게</span>
+        </div>
+      </div>
+      <svg width="100%" height="220" sc-camel-view-box="0 0 640 220" sc-camel-preserve-aspect-ratio="none" role="img" aria-label="Z1 무게 6시간 그래프, 증발로 천천히 줄고 급수 두 번에 약 10그램씩 오름" style="display:block;margin-top:12px">
+        <line x1="0" y1="50" x2="640" y2="50" stroke="#eef1f7"></line><line x1="0" y1="110" x2="640" y2="110" stroke="#eef1f7"></line><line x1="0" y1="170" x2="640" y2="170" stroke="#eef1f7"></line>
+        <line x1="236" y1="10" x2="236" y2="210" stroke="#8cb8ff" stroke-dasharray="4 4"></line><line x1="524" y1="10" x2="524" y2="210" stroke="#8cb8ff" stroke-dasharray="4 4"></line>
+        <path d="M0 90 L80 99 L160 108 L236 117 L240 72 L320 81 L400 92 L480 102 L524 109 L528 66 L600 72 L640 76" fill="none" stroke="#2f6bff" stroke-width="3" stroke-linejoin="round"></path>
+      </svg>
+    </div>
+    <div class="card" style="flex:1 1 320px;min-width:0">
+      <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:15px;font-weight:800">진단</div><a href="Diagnostics.dc.html" style="font-size:12.5px;font-weight:700;color:#2f6bff">전체 보기</a></div>
+      <div class="dx" style="border-top:0"><span class="tag" style="background:#fde8eb;color:#b4233a">고장</span><div><b>Z2 토양 A 선 빠짐</b><div style="color:#4f5b76;font-size:12px">3선 중 A(신호)선 확인</div></div></div>
+      <div class="dx"><span class="tag" style="background:#fff1e0;color:#b45309">주의</span><div><b>Z1 온습도 A·B 차이</b><div style="color:#4f5b76;font-size:12px">위치·열원 확인</div></div></div>
+      <div class="dx"><span class="tag" style="background:#fff1e0;color:#b45309">주의</span><div><b>Z3 무게 흔들림</b><div style="color:#4f5b76;font-size:12px">케이블이 판을 당기는지</div></div></div>
+      <div class="dx"><span class="tag" style="background:#e8efff;color:#2456d6">정보</span><div><b>Z3 유량 보정 전</b><div style="color:#4f5b76;font-size:12px"><a href="Calibrate.dc.html" style="color:#2f6bff;font-weight:700">보정하기</a></div></div></div>
+    </div>
+  </div>
+</div>
+</div>
+</x-dc>
+
+
+

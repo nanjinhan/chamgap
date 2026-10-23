@@ -1,0 +1,92 @@
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans','Noto Sans KR',sans-serif;color:#18213a}
+a{color:inherit;text-decoration:none}a:hover{color:#2f6bff}
+.card{background:#fff;border-radius:22px;box-shadow:0 10px 28px rgba(40,90,180,.12)}
+.st{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10.5px;font-weight:700;color:#4f5b76}
+.st b{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px}
+.kv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.kv div{background:#f4f8ff;border-radius:12px;padding:7px 9px}
+.kv span{display:block;font-size:10.5px;color:#5f6b85;font-family:'JetBrains Mono',monospace}
+.kv strong{font-size:15px}
+.q{border:0;border-radius:999px;padding:6px 11px;background:#fff;font-family:'JetBrains Mono',monospace;font-size:12px;color:#18213a}
+</style>
+
+<x-dc>
+<helmet>
+
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans','Noto Sans KR',sans-serif;color:#18213a}
+a{color:inherit;text-decoration:none}a:hover{color:#2f6bff}
+.card{background:#fff;border-radius:22px;box-shadow:0 10px 28px rgba(40,90,180,.12)}
+.st{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10.5px;font-weight:700;color:#4f5b76}
+.st b{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px}
+.kv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.kv div{background:#f4f8ff;border-radius:12px;padding:7px 9px}
+.kv span{display:block;font-size:10.5px;color:#5f6b85;font-family:'JetBrains Mono',monospace}
+.kv strong{font-size:15px}
+.q{border:0;border-radius:999px;padding:6px 11px;background:#fff;font-family:'JetBrains Mono',monospace;font-size:12px;color:#18213a}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:linear-gradient(170deg,#f4f8ff 0%,#dbe8ff 60%,#c2d8ff 100%);position:relative;overflow:hidden;padding:14px 20px 0">
+
+  <div style="display:flex;justify-content:center">
+    <div style="background:#0b0f1a;color:#fff;border-radius:999px;height:34px;padding:0 14px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600">
+      <span style="width:8px;height:8px;border-radius:50%;background:#8cb8ff"></span>시험 모드 · COM5
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
+    <a href="Main.dc.html" aria-label="뒤로" style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="#18213a" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></a>
+    <div style="font-size:17px;font-weight:800">센서 시험</div>
+    <span style="width:40px"></span>
+  </div>
+
+  <div class="card" style="margin-top:12px;padding:12px 10px">
+    <div style="display:flex;justify-content:space-between">
+      <div class="st"><b style="background:#16834a;color:#fff">00</b>I2C</div>
+      <div class="st"><b style="background:#16834a;color:#fff">01</b>온습도</div>
+      <div class="st" style="color:#2f6bff"><b style="border:3px solid #2f6bff;color:#2f6bff;box-sizing:border-box">02</b>토양</div>
+      <div class="st"><b style="background:#e3ecff">03</b>무게</div>
+      <div class="st"><b style="background:#e3ecff">04</b>12V</div>
+      <div class="st"><b style="background:#e3ecff">05</b>펌프</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px;padding:12px 14px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:14px;font-weight:800">02 토양수분 A·B</div>
+      <span style="font-size:11px;color:#4f5b76">t = soil · 1초마다</span>
+    </div>
+    <div class="kv" style="margin-top:10px">
+      <div><span>a_mv</span><strong>2400</strong></div>
+      <div><span>a</span><strong>0.077</strong></div>
+      <div><span>a_flag</span><strong style="color:#16834a">ok</strong></div>
+      <div><span>b_mv</span><strong>1800</strong></div>
+      <div><span>b</span><strong>0.538</strong></div>
+      <div><span>cal</span><strong style="color:#b45309">0</strong></div>
+    </div>
+    <div style="font-size:12px;color:#2b3550;margin-top:10px;line-height:1.55">확인할 것: 공기 중 mV &gt; 물속 mV, 손으로 잡으면 값이 내려감, A·B가 비슷하게 반응</div>
+  </div>
+
+  <div style="margin-top:12px;background:#0f1729;border-radius:18px;padding:10px 12px;height:150px;box-sizing:border-box;overflow:hidden;font-family:'JetBrains Mono',monospace;font-size:10.5px;line-height:1.6;color:#c8d3ea">
+    <div style="color:#7f8db0"># 02_soil 시작. 명령: air a / wet a / ...</div>
+    <div>{"t":"soilcal","a_air":2500,"a_wet":1200,...}</div>
+    <div>{"t":"soil","a_mv":2400,"a":0.077,...}</div>
+    <div style="color:#8cb8ff">→ air a</div>
+    <div style="color:#7f8db0"># soilA_air = 2400 mV 저장</div>
+    <div>{"t":"soil","a_mv":2398,"a":0.000,...}</div>
+  </div>
+
+  <div style="display:flex;gap:6px;margin-top:10px">
+    <button class="q">air a</button><button class="q">wet a</button><button class="q">air b</button><button class="q">wet b</button><button class="q">show</button>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:10px">
+    <label for="cmd" style="position:absolute;left:-9999px">명령 입력</label>
+    <input id="cmd" placeholder="명령 입력 (예: air a)" style="flex:1;height:46px;border-radius:14px;border:0;padding:0 14px;font-family:'JetBrains Mono',monospace;font-size:13px;background:#fff;color:#18213a">
+    <button style="width:72px;height:46px;border-radius:14px;border:0;background:#2f6bff;color:#fff;font-family:inherit;font-weight:700;font-size:13px">보내기</button>
+  </div>
+</div>
+</x-dc>
+
+
+

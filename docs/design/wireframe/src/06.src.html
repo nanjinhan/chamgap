@@ -1,0 +1,76 @@
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans','Noto Sans KR',sans-serif;color:#18213a}
+a{color:inherit;text-decoration:none}a:hover{color:#2f6bff}
+.card{background:#fff;border-radius:22px;box-shadow:0 10px 28px rgba(40,90,180,.12)}
+.chip{border:0;border-radius:999px;padding:8px 15px;font-family:inherit;font-size:13px;font-weight:600;background:#fff;color:#18213a}
+.step{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:#4f5b76;width:70px;text-align:center}
+.step b{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px}
+</style>
+
+<x-dc>
+<helmet>
+
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans','Noto Sans KR',sans-serif;color:#18213a}
+a{color:inherit;text-decoration:none}a:hover{color:#2f6bff}
+.card{background:#fff;border-radius:22px;box-shadow:0 10px 28px rgba(40,90,180,.12)}
+.chip{border:0;border-radius:999px;padding:8px 15px;font-family:inherit;font-size:13px;font-weight:600;background:#fff;color:#18213a}
+.step{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:#4f5b76;width:70px;text-align:center}
+.step b{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:linear-gradient(170deg,#f4f8ff 0%,#dbe8ff 60%,#c2d8ff 100%);position:relative;overflow:hidden;padding:14px 20px 0">
+
+  <div style="display:flex;justify-content:center">
+    <div style="background:#0b0f1a;color:#fff;border-radius:999px;height:34px;padding:0 14px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600">
+      <span style="width:8px;height:8px;border-radius:50%;background:#3ddc84"></span>3구역 연결
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
+    <a href="Diagnostics.dc.html" aria-label="뒤로" style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="#18213a" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></a>
+    <div style="font-size:17px;font-weight:800">보정 · Z1</div>
+    <span style="width:40px"></span>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-top:12px" role="tablist" aria-label="보정 종류">
+    <button class="chip" role="tab" aria-selected="true" style="background:#2f6bff;color:#fff;font-weight:700">로드셀</button>
+    <button class="chip" role="tab" aria-selected="false">토양 A·B</button>
+    <button class="chip" role="tab" aria-selected="false">펌프 유량</button>
+  </div>
+
+  <div class="card" style="margin-top:14px;padding:16px 12px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;position:relative">
+      <div style="position:absolute;left:46px;right:46px;top:17px;height:3px;background:#e3ecff"><div style="width:50%;height:3px;background:#2f6bff"></div></div>
+      <div class="step" style="position:relative"><b style="background:#2f6bff;color:#fff"><svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></b>빈 판 영점</div>
+      <div class="step" style="position:relative;color:#2f6bff"><b style="background:#fff;color:#2f6bff;border:3px solid #2f6bff;box-sizing:border-box">2</b>무게 올리기</div>
+      <div class="step" style="position:relative"><b style="background:#e3ecff;color:#5f6b85">3</b>확인</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px;padding:16px 14px">
+    <div style="font-size:16px;font-weight:800">무게를 아는 물건을 올리세요</div>
+    <div style="font-size:12.5px;color:#4f5b76;margin-top:4px;line-height:1.5">물 500mL 페트병처럼 무게를 정확히 아는 것. 판 가운데에 올리고 손을 떼세요.</div>
+    <label for="g" style="display:block;font-size:12px;font-weight:700;margin-top:14px">올린 무게 (g)</label>
+    <input id="g" type="number" value="500" style="margin-top:6px;width:100%;box-sizing:border-box;height:48px;border-radius:14px;border:1.5px solid #c9d6f0;padding:0 14px;font-family:inherit;font-size:20px;font-weight:700;color:#18213a">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;background:#f4f8ff;border-radius:14px;padding:10px 12px">
+      <div>
+        <div style="font-size:11px;color:#5f6b85">지금 읽는 값</div>
+        <div style="font-size:18px;font-weight:800">raw 94,750</div>
+      </div>
+      <span style="font-size:11.5px;font-weight:700;color:#16834a;background:#e3f5ea;border-radius:999px;padding:4px 10px">안정됨 ±3</span>
+    </div>
+  </div>
+
+  <div style="margin-top:12px;font-size:12px;color:#2b3550;background:rgba(255,255,255,.7);border-radius:14px;padding:9px 12px">1단계 완료: 영점 저장됨 (offset 84,000)</div>
+
+  <div style="display:flex;gap:10px;margin-top:16px">
+    <button style="flex:1;height:50px;border-radius:16px;border:0;background:#fff;color:#18213a;font-family:inherit;font-weight:700;font-size:14px">이전</button>
+    <button style="flex:2;height:50px;border-radius:16px;border:0;background:#2f6bff;color:#fff;font-family:inherit;font-weight:800;font-size:14px">500g으로 보정</button>
+  </div>
+  <div style="font-size:11px;color:#4f5b76;text-align:center;margin-top:10px">약 2초 걸립니다 · 그동안 판을 건드리지 마세요</div>
+</div>
+</x-dc>
+
+
+
