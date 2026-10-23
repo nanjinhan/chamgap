@@ -211,6 +211,82 @@ create policy service_status_diag_write on public.service_status for all to anon
 
 -- 삭제는 아무도 못 한다 (정책 없음 = 거부). 오래된 기록은 아래 자동 정리가 지운다.
 
+-- ============================================================ ESP32용 함수 (P2)
+-- 시각 판단은 모두 Supabase 시계로 한다 (ESP32 시계가 아직 안 맞아도 10초 만료가 정확하게)
+
+-- 명령 하나 가져가기: 10초 넘은 것은 expired, stop 이 먼저. stop 이면 대기 중인 water·flowcal 은 expired (COM-11·COM-12)
+create or replace function public.claim_command(p_node text)
+returns setof public.commands
+language plpgsql set search_path = '' as $$
+declare
+  c public.commands;
+begin
+  if not public.is_device() then
+    raise exception 'device key required' using errcode = '42501';
+  end if;
+  update public.commands set status = 'expired', done_at = now()
+   where node = p_node and status = 'pending'
+     and created_at < now() - interval '10 seconds' and lower(cmd) <> 'stop';
+  select * into c from public.commands
+   where node = p_node and status = 'pending'
+   order by (lower(cmd) = 'stop') desc, created_at, id
+   limit 1
+   for update skip locked;
+  if not found then
+    return;
+  end if;
+  if lower(c.cmd) = 'stop' then
+    update public.commands set status = 'expired', done_at = now()
+     where node = p_node and status = 'pending' and id <> c.id
+       and (lower(cmd) like 'water %' or lower(cmd) like 'flowcal %');
+  end if;
+  update public.commands set status = 'sent', picked_at = now() where id = c.id returning * into c;
+  return next c;
+end $$;
+
+-- 결과 적기: ack 를 result 에 넣고 done/failed
+create or replace function public.finish_command(p_id bigint, p_ok boolean, p_result jsonb)
+returns boolean
+language plpgsql set search_path = '' as $$
+begin
+  if not public.is_device() then
+    raise exception 'device key required' using errcode = '42501';
+  end if;
+  update public.commands
+     set status = case when p_ok then 'done' else 'failed' end, done_at = now(), result = p_result
+   where id = p_id and status = 'sent';
+  return found;
+end $$;
+
+revoke all on function public.claim_command(text) from public;
+revoke all on function public.finish_command(bigint, boolean, jsonb) from public;
+grant execute on function public.claim_command(text) to anon, authenticated;
+grant execute on function public.finish_command(bigint, boolean, jsonb) to anon, authenticated;
+
+-- nodes: 시각은 Supabase 가 붙인다
+create or replace function private.stamp_node() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  new.updated_at := now();
+  new.last_seen := now();
+  return new;
+end $$;
+
+drop trigger if exists nodes_stamp on public.nodes;
+create trigger nodes_stamp before insert or update on public.nodes for each row execute function private.stamp_node();
+
+-- 측정값이 들어오면 그 구역의 last_seen·pump 를 갱신한다 (ESP32가 따로 요청하지 않아도 되게)
+create or replace function private.touch_node() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.nodes (node, pump) values (new.node, coalesce(new.pump, 0))
+  on conflict (node) do update set pump = excluded.pump;
+  return null;
+end $$;
+
+drop trigger if exists readings_touch_node on public.readings;
+create trigger readings_touch_node after insert on public.readings for each row execute function private.touch_node();
+
 -- ============================================================ 실시간 (Realtime)
 
 do $$
@@ -274,9 +350,12 @@ select cron.schedule('chamgap-cleanup', '17 3 * * *', $job$
 $job$);
 
 -- 매분: 10초 넘게 아무도 가져가지 않은 명령은 expired (ESP32도 스스로 무시한다, COM-12). stop 은 예외
+-- 가져간 뒤 3분 넘게 결과가 없으면(도중에 ESP32가 꺼짐 등) failed
 select cron.schedule('chamgap-expire', '* * * * *', $job$
   update public.commands set status = 'expired', done_at = now()
   where status = 'pending' and created_at < now() - interval '10 seconds' and lower(cmd) <> 'stop';
+  update public.commands set status = 'failed', done_at = now(), result = '{"ok":0,"msg":"no_ack"}'::jsonb
+  where status = 'sent' and picked_at < now() - interval '3 minutes';
 $job$);
 
 -- ============================================================ 끝: 기기 키 확인

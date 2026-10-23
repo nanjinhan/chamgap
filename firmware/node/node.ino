@@ -1,17 +1,19 @@
-// 참값(CHAMGAP) 노드 펌웨어 — USB 시리얼 버전 (node-2.0-usb)
+// 참값(CHAMGAP) 노드 펌웨어 — WiFi · Supabase 버전 (node-2.1)
 //
 // 하는 일
-//  - DEFAULT_SAMPLE_MS(5초)마다 센서 값을 한 줄 JSON(data)으로 시리얼에 보낸다 → 노트북 서버가 받아 웹앱에 보여 준다
-//  - 시리얼로 받은 명령(info, tare, cal 500, soilcal a air, water 10, stop ...)을 실행하고 ack를 보낸다
-//  - 펌프 안전은 여기서 최종 판단한다 (부팅 시 끔, 최대 15초, 쉬는 시간 3초, 1회 50mL, 하루 300mL)
+//  - sample_ms(기본 5초)마다 센서 값을 Supabase readings 표에 올리고, 시리얼에도 한 줄 JSON(data)으로 보낸다
+//  - 웹에서 넣은 명령(commands 표)과 시리얼로 받은 명령(info, tare, cal 500, soilcal a air, water 10, stop ...)을
+//    실행하고 ack를 보낸다 (Supabase에서 온 명령은 결과를 commands 표에 적는다)
+//  - 펌프 안전은 여기서 최종 판단한다 (부팅 시 끔, 최대 15초, 쉬는 시간 3초, 1회 50mL, 하루 300mL).
+//    WiFi·Supabase가 끊겨도 펌프는 정해진 시간에 꺼진다 (네트워크는 cloud.h 의 별도 작업이 맡는다)
 //
-// 통신 규약: docs/01_requirements.md 4장. 설정은 config.h.
-// 다음 단계(P2)에서 WiFi로 Supabase에 올리는 부분을 더한다. 시리얼 출력은 그때도 그대로 둔다.
+// 통신 규약: docs/01_requirements.md 4장. 설정은 config.h, 비밀값은 secrets.h, 네트워크는 cloud.h.
 
 #include <Arduino.h>
 #include <Preferences.h>
 #include <math.h>
 #include "config.h"
+#include "cloud.h"
 
 #if USE_DHT11_A
 #include <DHT.h>
@@ -24,7 +26,7 @@
 #include <HX711.h>
 #endif
 
-#define FW_VERSION "node-2.0-usb"
+#define FW_VERSION "node-2.1"
 
 // ------------------------------------------------------------ 상태
 
@@ -77,7 +79,26 @@ bool pumpOn = false;
 unsigned long pumpStart = 0, pumpDur = 0, pumpOffAt = 0;
 bool pumpEverOff = false;
 float pumpMl = NAN;  // water로 켰을 때 mL, 아니면 NAN
-float dayMl = 0;     // 오늘 급수량 (WiFi·시각이 없는 지금은 부팅 후 누적)
+const char* lastOffReason = "";
+
+// 오늘 급수량 (FW-12, SAFE-10). 시각(NTP)을 알면 한국 날짜 기준으로 NVS에 저장하고,
+// 시각을 모르는 동안은 부팅 후 누적으로 센다
+float dayMl = 0;
+unsigned long dayKey = 0;  // 오늘 YYYYMMDD. 0 = 아직 시각 모름
+unsigned long savedDayKey = 0;
+float savedDayMl = 0;
+
+// 유량 측정 (flowcal): 안정 무게 → 펌프 → 안정 무게
+enum FcStage { FC_NONE, FC_BEFORE, FC_PUMP, FC_AFTER };
+FcStage fcStage = FC_NONE;
+unsigned long fcAt = 0;
+long fcMs = 0;
+float fcBefore = NAN;
+
+// Supabase 명령 id: 지금 처리 중인 명령(0이면 시리얼 명령), 시간이 걸리는 작업이 끝나면 답할 명령
+long ackCmdId = 0;
+long hxOpCmdId = 0;
+long fcCmdId = 0;
 
 // 시리얼 명령 한 줄
 String lineBuf;
@@ -86,11 +107,17 @@ String lineBuf;
 
 struct Json {
   String s;
-  Json(const char* t) {
-    s.reserve(512);
+  String type;
+  String ev;      // evt 의 종류 → events.ev
+  int bodyStart;  // "t"를 뺀 나머지가 시작하는 곳 (readings 행은 t 열이 없다)
+  bool okv = true;
+  Json(const char* t) : type(t) {
+    s.reserve(640);
     s = "{\"t\":\"";
     s += t;
-    s += "\",\"node\":\"";
+    s += "\",";
+    bodyStart = s.length();
+    s += "\"node\":\"";
     s += nodeId;
     s += "\",\"ms\":";
     s += String(millis());
@@ -115,14 +142,38 @@ struct Json {
     e.replace("\"", "\\\"");
     return raw(k, "\"" + e + "\"");
   }
-  void send() {
+  Json& evt(const char* name) {
+    ev = name;
+    return str("ev", name);
+  }
+  Json& ok(bool v) {
+    okv = v;
+    return b("ok", v);
+  }
+  // 시리얼에 한 줄 쓰고, 종류에 맞는 Supabase 표로 보낸다 (SYS-03)
+  String send() {
     s += "}";
-    Serial.println(s);
+    serialLine(s);
+    if (type == "data") {
+      cloudPost(CK_READING, "{" + s.substring(bodyStart));
+    } else if (type == "evt" || type == "info") {
+      String e = ev.length() ? "\"" + ev + "\"" : String("null");
+      cloudPost(CK_EVENT, "{\"node\":\"" + nodeId + "\",\"t\":\"" + type + "\",\"ev\":" + e + ",\"payload\":" + s + "}");
+    } else if (type == "ack" && ackCmdId > 0) {
+      cloudPost(CK_FINISH, "{\"p_id\":" + String(ackCmdId) + ",\"p_ok\":" + (okv ? "true" : "false") + ",\"p_result\":" + s + "}");
+      ackCmdId = 0;
+    }
+    return s;
   }
 };
 
 void ack(const String& cmd, bool ok, const String& msg = "") {
-  Json("ack").str("cmd", cmd).b("ok", ok).str("msg", msg).send();
+  Json("ack").str("cmd", cmd).ok(ok).str("msg", msg).send();
+}
+
+// 구역 상태(nodes 표): 펌프와 오늘 급수량
+void sendPumpState() {
+  cloudPost(CK_NODE, "{\"node\":\"" + nodeId + "\",\"pump\":" + (pumpOn ? "1" : "0") + ",\"day_ml\":" + String(dayMl, 1) + "}");
 }
 
 // ------------------------------------------------------------ 저장 (NVS)
@@ -141,9 +192,45 @@ void loadPrefs() {
   lcOffset = prefs.getLong("lc_off", 0);
   lcScale = prefs.getFloat("lc_scale", 0);
   pumpMlps = prefs.getFloat("pump_mlps", 0);
+  savedDayKey = prefs.getULong("day_key", 0);
+  savedDayMl = prefs.getFloat("day_ml", 0);
   prefs.end();
   nodeId.toUpperCase();
   if (sampleMs < 2000 || sampleMs > 600000) sampleMs = DEFAULT_SAMPLE_MS;
+}
+
+// 오늘 급수량 저장 (시각을 알 때만: 모르면 어느 날 값인지 몰라 저장된 값을 덮지 않는다)
+void saveDay() {
+  if (dayKey == 0) return;
+  prefs.begin("chamgap", false);
+  prefs.putULong("day_key", dayKey);
+  prefs.putFloat("day_ml", dayMl);
+  prefs.end();
+}
+
+// 한국 날짜 YYYYMMDD, 시각을 모르면 0
+unsigned long todayKey() {
+  struct tm t;
+  if (!getLocalTime(&t, 0) || t.tm_year + 1900 < 2025) return 0;
+  return (t.tm_year + 1900) * 10000UL + (t.tm_mon + 1) * 100UL + t.tm_mday;
+}
+
+// 1초마다: 시각을 처음 알게 되면 같은 날 저장된 급수량을 더하고, 날짜가 바뀌면 0부터 센다
+void dayTick() {
+  static unsigned long last = 0;
+  if (millis() - last < 1000) return;
+  last = millis();
+  unsigned long k = todayKey();
+  if (k == 0 || k == dayKey) return;
+  if (dayKey == 0) {
+    if (savedDayKey == k) dayMl += savedDayMl;  // 재시작 전에 오늘 준 물 (SAFE-10)
+    serialLine("# 시각 맞춤(NTP) 완료 · 오늘 " + String(k) + " · 오늘 급수 " + String(dayMl, 1) + "mL");
+  } else {
+    dayMl = 0;
+  }
+  dayKey = k;
+  saveDay();
+  sendInfo();
 }
 
 // ------------------------------------------------------------ 센서 읽기
@@ -274,7 +361,9 @@ void sendData() {
 #else
   j.null("leak");
 #endif
-  j.b("pump", pumpOn).null("rssi");
+  j.b("pump", pumpOn);
+  if (cloudWifiUp()) j.i("rssi", cloudRssi());
+  else j.null("rssi");
   j.send();
 }
 
@@ -286,19 +375,21 @@ void sendInfo() {
   j.i("soil_a_air", soilAir[0]).i("soil_a_wet", soilWet[0]).i("soil_b_air", soilAir[1]).i("soil_b_wet", soilWet[1]);
   j.b("lc_cal", lcCalibrated()).i("lc_offset", lcOffset).num("lc_scale", lcScale, 4);
   j.num("pump_mlps", pumpMlps, 3);
-  j.b("v12_sense", USE_V12_SENSE).b("leak_sensor", USE_LEAK).b("mqtt", false);
+  j.b("v12_sense", USE_V12_SENSE).b("leak_sensor", USE_LEAK).b("cloud", USE_CLOUD);
   j.num("day_ml", dayMl, 1).i("day_limit_ml", MAX_ML_PER_DAY).i("max_ml", MAX_ML_PER_SHOT);
   // 어떤 센서를 달았는지 (웹이 '고장'과 '연결 안 함'을 구분하게)
   j.str("sensor_a", USE_DHT11_A ? "DHT11" : (USE_SHT31_A ? "SHT31" : "none"));
   j.b("sht_a_present", USE_DHT11_A || USE_SHT31_A).b("sht_b_present", USE_SHT31_B);
   j.b("soil_a_present", USE_SOIL_A).b("soil_b_present", USE_SOIL_B);
   j.b("hx_present", USE_HX711).b("pump_present", USE_PUMP);
-  j.send();
+  String line = j.send();
+  cloudPost(CK_NODE, "{\"node\":\"" + nodeId + "\",\"fw\":\"" FW_VERSION "\",\"info\":" + line +
+                         ",\"pump\":" + (pumpOn ? "1" : "0") + ",\"day_ml\":" + String(dayMl, 1) + "}");
 }
 
 void sendBoot() {
   Json j("evt");
-  j.str("ev", "boot").str("fw", FW_VERSION).i("reset", (long)esp_reset_reason());
+  j.evt("boot").str("fw", FW_VERSION).i("reset", (long)esp_reset_reason());
 #if USE_SHT31_A
   j.b("sht_a", shtAFound);
 #else
@@ -324,38 +415,54 @@ void pumpStop(const char* reason) {
   pumpOn = false;
   pumpOffAt = millis();
   pumpEverOff = true;
-  Json("evt").str("ev", "pump_off").str("reason", reason).i("dur", pumpDur).i("ran", ran).num("ml", given, 1).send();
+  lastOffReason = reason;
+  Json("evt").evt("pump_off").str("reason", reason).i("dur", pumpDur).i("ran", ran).num("ml", given, 1).send();
+  if (!isnan(pumpMl)) saveDay();
   pumpMl = NAN;
+  sendPumpState();
 }
 
 void refuse(const String& cmd, const char* reason, long ms, float ml) {
-  Json("evt").str("ev", "refused").str("reason", reason).i("dur", ms).num("ml", ml, 1).send();
+  Json("evt").evt("refused").str("reason", reason).i("dur", ms).num("ml", ml, 1).send();
   ack(cmd, false, reason);
 }
 
-// water·pump 공통 검사. 통과하면 켠다
-void pumpRequest(const String& cmd, long ms, float ml) {
-  if (!USE_PUMP) return ack(cmd, false, "no_pump");
-  if (pumpOn) return refuse(cmd, "already_on", ms, ml);
-  if (pumpEverOff && millis() - pumpOffAt < PUMP_COOLDOWN_MS) return refuse(cmd, "cooldown", ms, ml);
+// water·pump·flowcal 공통 검사 (SAFE-03 순서). 통과하면 nullptr, 아니면 거부 이유. water면 ms를 계산해 넣는다
+const char* pumpCheck(long& ms, float ml) {
+  if (pumpOn) return "already_on";
+  if (pumpEverOff && millis() - pumpOffAt < PUMP_COOLDOWN_MS) return "cooldown";
   if (!isnan(ml)) {
-    if (ml < 1 || ml > MAX_ML_PER_SHOT) return refuse(cmd, "bad_ml", ms, ml);
-    if (dayMl + ml > MAX_ML_PER_DAY) return refuse(cmd, "daily_limit", ms, ml);
-    if (pumpMlps <= 0) return refuse(cmd, "flow_uncal", ms, ml);
+    if (ml < 1 || ml > MAX_ML_PER_SHOT) return "bad_ml";
+    if (dayMl + ml > MAX_ML_PER_DAY) return "daily_limit";
+    if (pumpMlps <= 0) return "flow_uncal";
     ms = lround(ml / pumpMlps * 1000.0);
   }
-  if (ms < PUMP_MS_MIN || ms > PUMP_MS_MAX) return refuse(cmd, "bad_ms", ms, ml);
-  if (USE_V12_SENSE && readV12() < V12_MIN_VOLT) return refuse(cmd, "no_12v", ms, ml);
-  if (leakNow()) return refuse(cmd, "leak", ms, ml);
-  if (!isnan(ml) && USE_HX711 && !hxOk()) return refuse(cmd, "scale_dead", ms, ml);
+  if (ms < PUMP_MS_MIN || ms > PUMP_MS_MAX) return "bad_ms";
+  if (USE_V12_SENSE && readV12() < V12_MIN_VOLT) return "no_12v";
+  if (leakNow()) return "leak";
+  if (!isnan(ml) && USE_HX711 && !hxOk()) return "scale_dead";
+  return nullptr;
+}
 
+void pumpRun(long ms, float ml) {
   pumpOn = true;
   pumpStart = millis();
   pumpDur = ms;
   pumpMl = ml;
-  if (!isnan(ml)) dayMl += ml;  // 안전 쪽으로: 켤 때 전부 더한다
   digitalWrite(PUMP_PIN, HIGH);
-  Json("evt").str("ev", "pump_on").i("dur", ms).num("ml", ml, 1).send();
+  if (!isnan(ml)) {
+    dayMl += ml;  // 안전 쪽으로: 켤 때 전부 더한다
+    saveDay();
+  }
+  Json("evt").evt("pump_on").i("dur", ms).num("ml", ml, 1).send();
+  sendPumpState();
+}
+
+void pumpRequest(const String& cmd, long ms, float ml) {
+  if (!USE_PUMP) return ack(cmd, false, "no_pump");
+  const char* why = pumpCheck(ms, ml);
+  if (why) return refuse(cmd, why, ms, ml);
+  pumpRun(ms, ml);
   ack(cmd, true);
 }
 
@@ -374,6 +481,8 @@ void hxOpStartNow(HxOp op, float gram) {
   hxOpN = 0;
   hxOpGram = gram;
   hxOpStart = millis();
+  hxOpCmdId = ackCmdId;  // 끝날 때 이 명령에 답한다
+  ackCmdId = 0;
 }
 
 void hxOpPoll() {
@@ -382,6 +491,8 @@ void hxOpPoll() {
   if (hxOpN >= 20 || millis() - hxOpStart > 4000) {
     HxOp op = hxOp;
     hxOp = HX_NONE;
+    ackCmdId = hxOpCmdId;
+    hxOpCmdId = 0;
     if (hxOpN < 5) return ack(cmd, false, "hx711 no response");
     double avg = hxOpSum / hxOpN;
     prefs.begin("chamgap", false);
@@ -406,11 +517,77 @@ void hxOpPoll() {
   }
 }
 
+// ------------------------------------------------------------ 유량 측정 flowcal (요구사항 4.3, 저장은 안 함)
+// 안정 무게 → ms 동안 펌프 → 물이 떨어질 때까지 기다린 뒤 안정 무게 → 증가량을 ack로 (before_g, after_g, delta_g)
+
+bool weightNow(float& g, bool& stable) {
+  if (!hxOk() || !lcCalibrated() || hxCount < HX_N) return false;
+  double avg, sd;
+  hxStats(avg, sd);
+  g = (avg - lcOffset) / lcScale;
+  stable = sd / fabs(lcScale) <= FLOWCAL_STABLE_SD_G;
+  return true;
+}
+
+void fcFinish(bool ok, const char* msg, float after) {
+  fcStage = FC_NONE;
+  ackCmdId = fcCmdId;
+  fcCmdId = 0;
+  float delta = isnan(fcBefore) || isnan(after) ? NAN : after - fcBefore;
+  Json("ack").str("cmd", "flowcal").ok(ok).str("msg", msg).i("dur", fcMs)
+      .num("before_g", fcBefore, 1).num("after_g", after, 1).num("delta_g", delta, 1).send();
+}
+
+void fcPoll() {
+  if (fcStage == FC_NONE) return;
+  unsigned long el = millis() - fcAt;
+  float g = NAN;
+  bool stable = false;
+  bool have = weightNow(g, stable);
+
+  if (fcStage == FC_BEFORE) {
+    if (have && stable) {
+      fcBefore = g;
+      long ms = fcMs;
+      const char* why = pumpCheck(ms, NAN);
+      if (why) {
+        Json("evt").evt("refused").str("reason", why).i("dur", ms).null("ml").send();
+        return fcFinish(false, why, NAN);
+      }
+      pumpRun(ms, NAN);
+      fcStage = FC_PUMP;
+      fcAt = millis();
+    } else if (el > FLOWCAL_BEFORE_MS) {
+      fcFinish(false, have ? "unstable" : "scale_dead", NAN);
+    }
+  } else if (fcStage == FC_PUMP) {
+    if (pumpOn) return;
+    if (strcmp(lastOffReason, "done") != 0) return fcFinish(false, lastOffReason, NAN);  // stop·누수·12V 등으로 멈춤
+    fcStage = FC_AFTER;
+    fcAt = millis();
+  } else if (fcStage == FC_AFTER) {
+    if (el < FLOWCAL_SETTLE_MS) return;
+    if (!(have && stable) && el < FLOWCAL_SETTLE_MS + FLOWCAL_AFTER_MS) return;
+    if (!have) return fcFinish(false, "scale_dead", NAN);
+    float delta = g - fcBefore;
+    if (delta > 0) {  // 실제로 준 물도 오늘 급수량에 센다
+      dayMl += delta;
+      saveDay();
+      sendPumpState();
+    }
+    fcFinish(stable, stable ? "" : "unstable", g);
+  }
+}
+
 // ------------------------------------------------------------ 명령 (요구사항 4.3)
+
+// 보정·펌프 작업이 진행 중인지 (그동안 다른 보정·펌프 명령은 busy)
+bool busy() { return hxOp != HX_NONE || fcStage != FC_NONE; }
 
 void handleCommand(String line) {
   line.trim();
   if (line.length() == 0) return;
+  bool fromCloud = ackCmdId > 0;
   String args[4];
   int n = 0, start = 0;
   for (int k = 0; k <= (int)line.length() && n < 4; k++) {
@@ -422,8 +599,12 @@ void handleCommand(String line) {
   String cmd = args[0];
   cmd.toLowerCase();
 
+  if (cmd == "help" || cmd == "pump") {
+    if (fromCloud) return ack(cmd, false, "serial_only");  // 웹에서는 water·flowcal만 (COM-13)
+  }
+
   if (cmd == "help") {
-    ack(cmd, true, "help status info water stop tare cal soilcal flow interval id reboot pump");
+    ack(cmd, true, "help status info water stop tare cal soilcal flow flowcal interval id reboot pump");
   } else if (cmd == "status") {
     sendData();
     ack(cmd, true);
@@ -436,20 +617,22 @@ void handleCommand(String line) {
     ack(cmd, true, was ? "" : "not running");
   } else if (cmd == "water") {
     if (n < 2) return ack(cmd, false, "usage: water <mL>");
+    if (busy()) return ack(cmd, false, "busy");
     pumpRequest(cmd, 0, args[1].toFloat());
   } else if (cmd == "pump") {
     if (n < 2) return ack(cmd, false, "usage: pump <ms>");
+    if (busy()) return ack(cmd, false, "busy");
     pumpRequest(cmd, args[1].toInt(), NAN);
   } else if (cmd == "tare") {
     if (!USE_HX711 || !hxOk()) return ack(cmd, false, "hx711 no response");
-    if (hxOp != HX_NONE) return ack(cmd, false, "busy");
+    if (busy()) return ack(cmd, false, "busy");
     hxOpStartNow(HX_TARE, 0);
   } else if (cmd == "cal") {
     float g = n >= 2 ? args[1].toFloat() : 0;
     if (g <= 0) return ack(cmd, false, "usage: cal <g>");
     if (!lcHasOffset) return ack(cmd, false, "tare first");
     if (!USE_HX711 || !hxOk()) return ack(cmd, false, "hx711 no response");
-    if (hxOp != HX_NONE) return ack(cmd, false, "busy");
+    if (busy()) return ack(cmd, false, "busy");
     hxOpStartNow(HX_CAL, g);
   } else if (cmd == "soilcal") {
     String ch = args[1], kind = args[2];
@@ -481,6 +664,20 @@ void handleCommand(String line) {
     prefs.end();
     ack(cmd, true, "mlps=" + String(pumpMlps, 3));
     sendInfo();
+  } else if (cmd == "flowcal") {
+    long ms = args[1].toInt();
+    if (!USE_PUMP) return ack(cmd, false, "no_pump");
+    if (ms < PUMP_MS_MIN || ms > PUMP_MS_MAX) return ack(cmd, false, "bad_ms");
+    if (!USE_HX711 || !hxOk()) return ack(cmd, false, "scale_dead");
+    if (!lcCalibrated()) return ack(cmd, false, "lc_uncal");  // 로드셀 보정(tare·cal)이 먼저
+    if (dayMl >= MAX_ML_PER_DAY) return ack(cmd, false, "daily_limit");
+    if (busy()) return ack(cmd, false, "busy");
+    fcStage = FC_BEFORE;
+    fcAt = millis();
+    fcMs = ms;
+    fcBefore = NAN;
+    fcCmdId = ackCmdId;  // 끝날 때(최대 약 90초 뒤) 이 명령에 답한다
+    ackCmdId = 0;
   } else if (cmd == "interval") {
     long ms = args[1].toInt();
     if (ms < 2000 || ms > 600000) return ack(cmd, false, "range 2000-600000");
@@ -501,20 +698,27 @@ void handleCommand(String line) {
   } else if (cmd == "reboot") {
     pumpStop("reboot");
     ack(cmd, true);
+    cloudFlush(3000);  // 결과를 Supabase에 보낸 뒤 재시작
     delay(200);
     ESP.restart();
-  } else if (cmd == "flowcal") {
-    ack(cmd, false, "not_supported_yet");  // P2에서 (펌프 + 전후 무게)
   } else {
     ack(cmd, false, "unknown command");
   }
+}
+
+// 명령 하나 실행. id > 0 이면 Supabase에서 온 명령이라 ack가 그 명령의 결과로 올라간다
+void runCommand(const String& line, long id) {
+  if (id > 0) serialLine("# 웹 명령 #" + String(id) + ": " + line);
+  ackCmdId = id;
+  handleCommand(line);
+  ackCmdId = 0;
 }
 
 void serialPoll() {
   while (Serial.available()) {
     char c = (char)Serial.read();
     if (c == '\n') {
-      handleCommand(lineBuf);
+      runCommand(lineBuf, 0);
       lineBuf = "";
     } else if (c != '\r' && lineBuf.length() < 120) {
       lineBuf += c;
@@ -529,6 +733,7 @@ void setup() {
   pinMode(PUMP_PIN, OUTPUT);
   digitalWrite(PUMP_PIN, LOW);
 
+  serialMutex = xSemaphoreCreateMutex();
   Serial.begin(115200);
   delay(300);
   loadPrefs();
@@ -553,7 +758,14 @@ void setup() {
   pinMode(LEAK_PIN, INPUT_PULLUP);
 #endif
 
-  Serial.println("# 참값 노드 시작 " FW_VERSION " · 구역 " + nodeId);
+  serialLine("# 참값 노드 시작 " FW_VERSION " · 구역 " + nodeId);
+#if USE_SHT31_A
+  serialLine(shtAFound ? "# 온습도 A (SHT31, 0x44) 찾음" : "# 온습도 A (SHT31, 0x44) 못 찾음 — SDA 21·SCL 22·3.3V·GND 선, A의 ADR 핀이 GND인지 확인");
+#endif
+#if USE_SHT31_B
+  serialLine(shtBFound ? "# 온습도 B (SHT31, 0x45) 찾음" : "# 온습도 B (SHT31, 0x45) 못 찾음 — B의 ADR 핀을 VIN(3.3V)에 연결해야 0x45가 된다");
+#endif
+  cloudBegin(nodeId);  // WiFi·Supabase는 코어 0에서 따로 (이 함수는 바로 돌아온다)
   sendBoot();
   sendInfo();
   lastSample = millis() - sampleMs + 1500;  // 첫 측정은 1.5초 뒤 (DHT11 준비 시간)
@@ -563,7 +775,12 @@ void loop() {
   hxPoll();
   hxOpPoll();
   serialPoll();
+  CloudCmd c;
+  if (cloudNextCommand(c)) runCommand(c.cmd, c.id);
   pumpPoll();
+  fcPoll();
+  dayTick();
+  if (cloudTakeJustConnected()) sendInfo();  // WiFi에 붙을 때마다 nodes 표를 최신으로
   if (millis() - lastSample >= sampleMs) {
     lastSample = millis();
     sendData();

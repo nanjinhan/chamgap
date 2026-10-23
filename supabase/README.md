@@ -49,5 +49,8 @@ node supabase/check.mjs
 | `diagnostics`, `service_status` | 진단 서버(선택)용 |
 | `latest_readings` | 구역별 마지막 측정값 (웹 첫 화면용) |
 | `history()` | 그래프용 평균 (1분·5분·15분) |
+| `claim_command()`, `finish_command()` | ESP32가 명령을 하나 가져가고(10초 넘은 것은 expired, stop 먼저) 결과를 적는 함수. 기기 키 필요 (P2에서 추가) |
+
+`schema.sql`이 바뀌면 SQL Editor에서 **전체를 다시 실행**한다. 이미 있는 값과 기기 키는 그대로 남는다.
 
 권한: 누구나 읽기. 웹은 명령 넣기·메모만. 측정값·상태 쓰기는 `x-device-key`가 맞는 ESP32만. 웹이 보낼 수 있는 명령은 허용 목록만(`pump`·`help` 불가). 삭제는 아무도 못 하고 자동 정리만 지운다.

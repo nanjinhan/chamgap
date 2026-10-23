@@ -1,9 +1,11 @@
-// 참값(CHAMGAP) Supabase 권한 확인 (P1) — 요구사항지시서 v2.0 CLD-02·COM-12·COM-13
+// 참값(CHAMGAP) Supabase 권한 확인 (P1·P2) — 요구사항지시서 v2.0 CLD-02·COM-11·COM-12·COM-13
 //
 // 실행: node supabase/check.mjs        (Node 18 이상, 설치할 것 없음)
 // 주소와 공개 키는 web/.env.local 의 VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY 에서 읽는다.
-// 기기 키(device_key) 없이, 웹과 같은 공개 키로만 확인한다.
-// 남는 것: 실행할 때마다 node 'TEST' 명령 1줄 (실제 ESP32는 가져가지 않고, 7일 뒤 자동 정리가 지운다)
+// 1) 웹과 같은 공개 키로: 읽기·쓰기 거부·명령 허용 목록·만료
+// 2) firmware/node/secrets.h 에 DEVICE_KEY 가 있으면 ESP32와 같은 요청으로: 기기 키 쓰기, 명령 가져가기·결과 적기
+// 남는 것: node 'TEST' 명령 몇 줄 (실제 ESP32는 가져가지 않고, 7일 뒤 자동 정리가 지운다).
+//         측정값·구역 상태는 구역 이름을 일부러 규칙 밖('TEST!')으로 보내 권한만 확인하고 행은 남기지 않는다
 
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -32,6 +34,17 @@ const key = env.VITE_SUPABASE_ANON_KEY ?? ''
 if (!url.startsWith('https://') || !key || key.includes('...')) {
   console.error('web/.env.local 의 VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY 가 비어 있습니다.')
   process.exit(2)
+}
+
+// ESP32 기기 키 (없으면 기기 확인은 건너뛴다)
+function readDeviceKey() {
+  try {
+    const text = readFileSync(join(root, 'firmware', 'node', 'secrets.h'), 'utf8')
+    const m = text.match(/^#define\s+DEVICE_KEY\s+"([^"]*)"/m)
+    return m && /^[0-9a-f]{16,}$/.test(m[1]) ? m[1] : ''
+  } catch {
+    return ''
+  }
 }
 
 // 새 공개 키(sb_publishable_)는 JWT가 아니라 apikey 헤더에만 넣는다. 옛 anon 키는 둘 다 넣는다
@@ -182,8 +195,119 @@ async function main() {
     )
   }
 
+  await deviceChecks()
+
   console.log(failures === 0 ? '\n모두 통과했습니다.' : `\n실패 ${failures}개 — 위 '실패' 줄을 확인하세요.`)
   process.exitCode = failures === 0 ? 0 : 1
+}
+
+// ESP32(node.ino·cloud.h)가 보내는 것과 같은 요청
+async function deviceChecks() {
+  const deviceKey = readDeviceKey()
+  if (!deviceKey) {
+    console.log('\n[기기] firmware/node/secrets.h 에 DEVICE_KEY 가 없어 건너뜁니다')
+    return
+  }
+  const DEV = { 'x-device-key': deviceKey }
+  console.log('\n[기기] ESP32와 같은 요청 (기기 키)')
+  {
+    const r = await rest('POST', 'rpc/is_device', {}, DEV)
+    report(r.status === 200 && r.json === true, 'DEVICE_KEY 가 맞음 (is_device() = true)', why(r))
+  }
+
+  // 구역 이름 'TEST!'는 규칙(대문자·숫자·_-)에 어긋난다 → 권한(RLS)을 통과해야만 이름 규칙(23514)에서 멈춘다. 행은 안 남는다
+  const reading = {
+    node: 'TEST!',
+    ms: 20111,
+    seq: 4,
+    sht_a_ok: 1,
+    temp_a: 23.4,
+    rh_a: 45.1,
+    sht_b_ok: null,
+    temp_b: null,
+    rh_b: null,
+    soil_a_mv: 2400,
+    soil_a: 0.077,
+    soil_b_mv: 1800,
+    soil_b: 0.538,
+    hx_ok: 1,
+    weight_g: null,
+    weight_sd: null,
+    weight_raw: 94750,
+    v12: null,
+    leak: null,
+    pump: 0,
+    rssi: -55,
+  }
+  {
+    const r = await rest('POST', 'readings', reading, { ...DEV, Prefer: 'return=minimal' })
+    report(refusedBy(r, CHECK), 'readings: 기기 키로 권한 통과, 펌웨어 data 키가 모두 표의 열', why(r))
+  }
+  {
+    const body = { node: 'TEST!', fw: 'node-2.1', info: { t: 'info' }, pump: 0, day_ml: 0 }
+    const prefer = 'resolution=merge-duplicates,return=minimal'
+    const r = await rest('POST', 'nodes?on_conflict=node', body, { ...DEV, Prefer: prefer })
+    report(refusedBy(r, CHECK), 'nodes: 기기 키로 구역 상태 쓰기 권한 통과', why(r))
+  }
+
+  // 명령 가져가기·결과 적기 (schema.sql 의 claim_command·finish_command)
+  const claim = (headers = DEV) => rest('POST', 'rpc/claim_command', { p_node: 'TEST' }, headers)
+  const finish = (id, ok, result) => rest('POST', 'rpc/finish_command', { p_id: id, p_ok: ok, p_result: result }, DEV)
+  const getCmd = async (id) => (await rest('GET', `commands?id=eq.${id}&select=*`)).json?.[0]
+  const add = async (cmd) => (await rest('POST', 'commands', { node: 'TEST', cmd }, RETURN_ROW)).json?.[0]
+  const first = (r) => (Array.isArray(r.json) ? r.json[0] : undefined)
+
+  {
+    const r = await claim({})
+    if (r.status === 404) {
+      report(false, 'claim_command 함수가 없음', 'supabase/schema.sql 을 SQL Editor에서 다시 실행하세요')
+      return
+    }
+    report(refusedBy(r, RLS), '기기 키 없이 명령 가져가기 거부', why(r))
+  }
+  // 앞선 시험에서 남은 TEST 명령 정리
+  for (let k = 0; k < 10; k++) {
+    const left = first(await claim())
+    if (!left) break
+    await finish(left.id, false, { msg: 'check_drain' })
+  }
+
+  const water = await add('water 10')
+  const info = await add('info')
+  const stop = await add('stop')
+  if (!water || !info || !stop) return report(false, '시험 명령 넣기', '')
+
+  const got1 = first(await claim())
+  report(got1?.id === stop.id && got1?.status === 'sent', 'stop 이 먼저 (COM-11)', `${got1?.cmd} → ${got1?.status}`)
+  report((await getCmd(water.id))?.status === 'expired', 'stop 이 오면 대기 중인 water 는 expired', '')
+  const ack = { t: 'ack', node: 'TEST', ms: 1, cmd: 'stop', ok: 1, msg: 'not running' }
+  const f1 = await finish(stop.id, true, ack)
+  const s1 = await getCmd(stop.id)
+  report(
+    f1.json === true && s1?.status === 'done' && s1?.result?.cmd === 'stop',
+    '결과 적기 → done + result',
+    `status=${s1?.status}`,
+  )
+
+  const got2 = first(await claim())
+  report(got2?.id === info.id, '다음은 info (stop 이 아닌 명령은 그대로 둠)', got2?.cmd)
+  if (got2) {
+    await finish(got2.id, false, { ...ack, cmd: 'info', ok: 0, msg: 'test' })
+    report((await getCmd(got2.id))?.status === 'failed', 'ok=0 이면 failed', '')
+  }
+  const again = await finish(stop.id, true, ack)
+  report(again.json === false, '이미 끝난 명령에 다시 적기 안 됨', JSON.stringify(again.json))
+
+  const old = await add('info')
+  process.stdout.write('  (만료 확인: 11초 기다리는 중)')
+  await new Promise((resolve) => setTimeout(resolve, 11_000))
+  console.log('')
+  const c3 = await claim()
+  report(
+    Array.isArray(c3.json) && c3.json.length === 0 && (await getCmd(old.id))?.status === 'expired',
+    '10초 넘은 명령은 ESP32가 가져갈 때 바로 expired (COM-12)',
+    why(c3),
+  )
 }
 
 await main()
