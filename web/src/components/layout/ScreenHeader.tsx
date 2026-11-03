@@ -1,36 +1,22 @@
 import type { ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { IconBack } from '@/components/icons'
 
 type Props = {
   title: string
+  /** 예전 화면 호환용 (뒤로 버튼은 이제 맨 위 TopBar에 있다) */
   back?: boolean | string
   right?: ReactNode
   sub?: ReactNode
 }
 
-/** 하위 화면 맨 위 (와이어프레임 02~07): 뒤로 · 가운데 제목(17px/800) · 오른쪽 둥근 버튼 */
-export function ScreenHeader({ title, back = true, right, sub }: Props) {
-  const navigate = useNavigate()
+/** 하위 화면 제목 (새 디자인: 큰 흰 글자). 뒤로 버튼은 TopBar가 맡는다 */
+export function ScreenHeader({ title, right, sub }: Props) {
   return (
-    <header className="mt-3.5 grid grid-cols-[40px_1fr_40px] items-center">
-      {back ? (
-        <button
-          type="button"
-          aria-label="뒤로"
-          className="flex size-10 items-center justify-center rounded-full text-ink hover:bg-white/60"
-          onClick={() => (typeof back === 'string' ? navigate(back) : navigate(-1))}
-        >
-          <IconBack size={20} strokeWidth={2} />
-        </button>
-      ) : (
-        <span />
-      )}
-      <div className="min-w-0 text-center">
-        <h1 className="truncate text-[17px] font-extrabold">{title}</h1>
-        {sub ? <div className="truncate text-[12px] text-ink-2">{sub}</div> : null}
+    <header className="mt-6 flex items-end justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="truncate text-[34px] leading-tight font-light tracking-[-0.02em]">{title}</h1>
+        {sub ? <div className="mt-1 truncate text-[13px] text-ds-text-2">{sub}</div> : null}
       </div>
-      <div className="flex justify-end">{right}</div>
+      {right ? <div className="shrink-0">{right}</div> : null}
     </header>
   )
 }

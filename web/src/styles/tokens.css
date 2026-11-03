@@ -31,6 +31,27 @@
   --offline: #6b7280;
   --offline-soft: #eef0f3;
 
+  /* ===== 새 디자인 (design/*.jpg, 2026-11-03): 회색·초록 사진 배경 위 유리 카드, 연두 포인트, 흰 글자 ===== */
+  --ds-bg-home: linear-gradient(180deg, #5d6b74 0%, #6b7982 16%, #83919a 36%, #9ca7aa 60%, #a9aca6 100%);
+  --ds-bg-sub: linear-gradient(180deg, #56625f 0%, #3a4642 42%, #29332f 100%);
+  --ds-text: #ffffff;
+  --ds-text-2: rgba(255, 255, 255, 0.8);
+  --ds-text-3: rgba(255, 255, 255, 0.6);
+  --ds-lime: #cdee74; /* 진행 막대·선택 고리 */
+  --ds-lime-soft: #d6ec9a; /* 범위 막대 채움 */
+  --ds-track: rgba(255, 255, 255, 0.38);
+  --ds-glass: rgba(34, 38, 33, 0.42); /* 어두운 유리 (구역 동그라미) */
+  --ds-glass-light: rgba(232, 231, 225, 0.42); /* 밝은 유리 (오늘 급수량 카드) */
+  --ds-glass-line: rgba(255, 255, 255, 0.32);
+  --ds-btn: #e7e6e2; /* 밝은 알약 버튼 */
+  --ds-btn-ink: #1d2320;
+  --ds-ok: #9be36f;
+  --ds-info: #a9d2ff;
+  --ds-warn: #f6d55a;
+  --ds-fault: #ff8a7a;
+  --ds-offline: #d3d7da;
+  --ds-shadow-text: 0 1px 2px rgba(0, 0, 0, 0.18);
+
   --radius-card: 22px;
   --radius-btn: 16px;
   --shadow-card: 0 10px 28px rgba(40, 90, 180, 0.12);
@@ -70,9 +91,9 @@
 }
 
 @theme inline {
-  /* 와이어프레임과 같은 글꼴: 숫자·영문 Plus Jakarta Sans, 한글 Noto Sans KR */
+  /* 새 디자인과 같은 글꼴: Pretendard (영문·숫자는 Inter 계열, 한글 포함) */
   --font-sans:
-    'Plus Jakarta Sans Variable', 'Noto Sans KR Variable', 'Noto Sans KR', system-ui, -apple-system, 'Segoe UI',
+    'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo', 'Segoe UI',
     sans-serif;
   --font-heading: var(--font-sans);
   --font-mono: ui-monospace, 'Cascadia Mono', Consolas, 'D2Coding', monospace;
@@ -101,6 +122,11 @@
   --color-ink-3: var(--ink-3);
   --color-offline: var(--offline);
   --color-offline-soft: var(--offline-soft);
+  --color-ds-text-2: var(--ds-text-2);
+  --color-ds-text-3: var(--ds-text-3);
+  --color-ds-lime: var(--ds-lime);
+  --color-ds-btn: var(--ds-btn);
+  --color-ds-btn-ink: var(--ds-btn-ink);
 
   --radius-card: var(--radius-card);
   --radius-btn: var(--radius-btn);

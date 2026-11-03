@@ -12,7 +12,7 @@ const ICON_COLOR: Record<ToastTone, string> = {
 }
 
 /**
- * 명령 결과 알림 (Swipe Toast). 하단 탭 바와 모두 정지 버튼을 가리지 않게 그 위에 쌓는다.
+ * 명령 결과 알림 (Swipe Toast). 화면 맨 아래에 쌓는다.
  * 고장 알림은 assertive, 나머지는 polite로 읽어 준다.
  */
 export function ToastHost() {
@@ -21,7 +21,7 @@ export function ToastHost() {
   return (
     <div
       className="pointer-events-none fixed inset-x-0 z-[60] mx-auto flex w-[min(380px,calc(100vw-32px))] flex-col gap-2 "
-      style={{ bottom: 'calc(var(--safe-bottom) + 16px + 60px + 12px)' }}
+      style={{ bottom: 'calc(var(--safe-bottom) + 16px)' }}
     >
       {items.map((t) => {
         const Icon = ICON[t.tone]
