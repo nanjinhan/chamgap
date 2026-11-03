@@ -30,6 +30,14 @@ struct CloudCmd {
   char cmd[64];
 };
 
+// 연결 상태 숫자 (원격 진단용)
+struct CloudStats {
+  uint32_t wifiDrops;  // 부팅 후 WiFi가 끊긴 횟수
+  int dropReason;      // 마지막으로 끊긴 이유 번호 (wifi_err_reason_t)
+  uint32_t netFails;   // HTTPS 요청이 연결 오류로 실패한 횟수
+  bool realtime;       // Realtime 명령 알림이 연결돼 있는지
+};
+
 #if USE_CLOUD
 
 #if __has_include("secrets.h")
@@ -61,11 +69,18 @@ static volatile bool sending = false;
 
 static WiFiClientSecure tls;
 static HTTPClient http;
-static WebSocketsClient rt;
+static WebSocketsClient rt;  // rtTask 에서만 쓴다
 static bool rtStarted = false;
-static bool rtWake = false;
+static volatile bool rtWake = false;
 static unsigned long rtLastBeat = 0, lastClaim = 0, lastFailLog = 0, lastRssi = 0;
 static long rtRef = 1;
+
+// 스스로 고치기와 원격 진단용 (info 에 실려 Supabase로 간다)
+static volatile unsigned long lastReachAt = 0;  // 마지막으로 Supabase가 응답한 시각
+static unsigned long lastHealAt = 0;
+static volatile bool needRestart = false;
+static volatile uint32_t wifiDrops = 0, netFails = 0;
+static volatile int lastDropReason = 0;
 
 static void cloudLog(const String& msg) { serialLine("# " + msg); }
 
@@ -157,7 +172,12 @@ static int rest(const char* path, const String& body, const char* prefer, String
   int code = http.POST(body);
   if (resp) *resp = code > 0 ? http.getString() : String();
   http.end();
-  if (code < 0) tls.stop();  // 연결이 깨졌으면 다음에 새로 연다
+  if (code > 0) {
+    lastReachAt = millis();  // 오류 응답이어도 인터넷 길은 살아 있다
+  } else {
+    netFails = netFails + 1;
+    tls.stop();  // 연결이 깨졌으면 다음에 새로 연다
+  }
   return code;
 }
 
@@ -187,8 +207,8 @@ static void sendOne(const CloudOut& o) {
   const char* prefer = o.kind == CK_NODE ? "resolution=merge-duplicates,return=minimal" : "return=minimal";
   String resp;
   int code = -1;
-  // 측정값은 한 번만, 사건·명령 결과는 연결 오류면 한 번 더
-  for (int k = 0; k < (o.kind == CK_READING ? 1 : 2); k++) {
+  // 연결 오류(code < 0)면 새 연결로 한 번 더
+  for (int k = 0; k < 2; k++) {
     code = rest(pathOf(o.kind), *o.body, prefer, &resp);
     if (code > 0) break;
   }
@@ -280,20 +300,43 @@ static void rtStart() {
   rtStarted = true;
 }
 
+// Realtime은 따로 돈다: 라이브러리 안의 보안 연결은 응답을 최대 120초 기다려서,
+// 같은 작업에 두면 그동안 측정값 올리기까지 멈췄다
+static void rtTask(void*) {
+  for (;;) {
+    if (!wifiUp) {
+      rtJoined = false;
+      vTaskDelay(pdMS_TO_TICKS(200));
+      continue;
+    }
+    if (!rtStarted) rtStart();
+    rt.loop();
+    if (rtJoined && millis() - rtLastBeat > 25000) {  // Phoenix 심장박동 (없으면 서버가 끊는다)
+      rtLastBeat = millis();
+      rtSend(String("{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":\"") + String(rtRef++) + "\"}");
+    }
+    vTaskDelay(pdMS_TO_TICKS(20));
+  }
+}
+
 // ------------------------------------------------------------ 작업 본체 (코어 0)
 
 static void cloudTask(void*) {
   WiFi.onEvent(onWifiEvent);
   WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false);         // 절전을 끈다: 일부 공유기에서 몇 분마다 끊기는 원인
   WiFi.setAutoReconnect(true);  // 붙었던 곳이 잠깐 끊기면 스스로 다시 붙는다
   wifiConnect();
-  tls.setInsecure();  // FW-14: 처음에는 인증서 확인 없이
+  tls.setInsecure();            // FW-14: 처음에는 인증서 확인 없이
+  tls.setHandshakeTimeout(10);  // 기본 120초 → 네트워크가 불안할 때 2분씩 멈추지 않게
   http.setReuse(true);
   http.setTimeout(6000);
   http.setConnectTimeout(6000);
+  xTaskCreatePinnedToCore(rtTask, "realtime", 12288, nullptr, 1, nullptr, 0);
 
   bool timeSet = false;
   unsigned long lastTry = millis();
+  lastReachAt = millis();
   for (;;) {
     bool up = WiFi.status() == WL_CONNECTED;
     if (up && !wifiUp) {
@@ -304,15 +347,30 @@ static void cloudTask(void*) {
         configTzTime("KST-9", "pool.ntp.org", "time.google.com", "kr.pool.ntp.org");  // FW-12 한국 시간
         timeSet = true;
       }
-      if (!rtStarted) rtStart();
       justConnected = true;
       lastClaim = 0;
+      lastReachAt = lastHealAt = millis();  // 붙은 뒤 3분은 기다려 본다
     } else if (!up && wifiUp) {
       wifiUp = false;
       rtJoined = false;
+      wifiDrops = wifiDrops + 1;
+      lastDropReason = wifiReason;
       tls.stop();
-      cloudLog("WiFi 끊김 — 다시 연결하는 중 (측정·펌프 안전은 계속 동작)");
+      cloudLog("WiFi 끊김 (" + wifiReasonText(wifiReason) + ") — 다시 연결하는 중 (측정·펌프 안전은 계속 동작)");
       lastTry = millis();
+    }
+
+    // 스스로 고치기: WiFi는 붙어 있는데 3분 넘게 Supabase에 못 닿으면 WiFi를 다시 연결,
+    // 10분이 넘으면 본 루프에 재시작을 부탁한다 (펌프가 꺼져 있을 때만 재시작한다)
+    if (up) {
+      unsigned long sinceReach = millis() - lastReachAt;
+      if (sinceReach > 600000UL) needRestart = true;
+      else if (sinceReach > 180000UL && millis() - lastHealAt > 180000UL) {
+        lastHealAt = millis();
+        cloudLog("3분 넘게 Supabase에 못 닿았어요 — WiFi를 다시 연결합니다");
+        WiFi.disconnect();
+        continue;
+      }
     }
 
     if (!up) {
@@ -334,11 +392,6 @@ static void cloudTask(void*) {
     if (millis() - lastRssi > 2000) {
       lastRssi = millis();
       rssiNow = WiFi.RSSI();
-    }
-    rt.loop();
-    if (rtJoined && millis() - rtLastBeat > 25000) {  // Phoenix 심장박동 (없으면 서버가 끊는다)
-      rtLastBeat = millis();
-      rtSend(String("{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":\"") + String(rtRef++) + "\"}");
     }
 
     CloudOut o;
@@ -404,6 +457,12 @@ bool cloudTakeJustConnected() {
 bool cloudWifiUp() { return wifiUp; }
 int cloudRssi() { return rssiNow; }
 
+// 원격 진단용 숫자 (info 에 실어 보낸다)
+CloudStats cloudStats() { return {wifiDrops, lastDropReason, netFails, rtJoined}; }
+
+// 오래 Supabase에 못 닿아 재시작이 필요한지 (본 루프가 펌프가 꺼져 있을 때 재시작한다)
+bool cloudNeedsRestart() { return needRestart; }
+
 // 재시작 전에 남은 것을 보낸다 (최대 ms)
 void cloudFlush(unsigned long ms) {
   unsigned long t = millis();
@@ -418,6 +477,8 @@ bool cloudNextCommand(CloudCmd&) { return false; }
 bool cloudTakeJustConnected() { return false; }
 bool cloudWifiUp() { return false; }
 int cloudRssi() { return 0; }
+CloudStats cloudStats() { return {0, 0, 0, false}; }
+bool cloudNeedsRestart() { return false; }
 void cloudFlush(unsigned long) {}
 
 #endif

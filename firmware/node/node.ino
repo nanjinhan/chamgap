@@ -382,6 +382,10 @@ void sendInfo() {
   j.b("sht_a_present", USE_DHT11_A || USE_SHT31_A).b("sht_b_present", USE_SHT31_B);
   j.b("soil_a_present", USE_SOIL_A).b("soil_b_present", USE_SOIL_B);
   j.b("hx_present", USE_HX711).b("pump_present", USE_PUMP);
+  // 연결 상태 (시리얼 없이 원격으로 원인을 보려고)
+  CloudStats cs = cloudStats();
+  j.i("wifi_drops", cs.wifiDrops).i("wifi_reason", cs.dropReason).i("net_fail", cs.netFails).b("rt", cs.realtime);
+  j.i("heap", ESP.getFreeHeap()).i("heap_min", ESP.getMinFreeHeap()).i("up_s", millis() / 1000);
   String line = j.send();
   cloudPost(CK_NODE, "{\"node\":\"" + nodeId + "\",\"fw\":\"" FW_VERSION "\",\"info\":" + line +
                          ",\"pump\":" + (pumpOn ? "1" : "0") + ",\"day_ml\":" + String(dayMl, 1) + "}");
@@ -781,6 +785,16 @@ void loop() {
   fcPoll();
   dayTick();
   if (cloudTakeJustConnected()) sendInfo();  // WiFi에 붙을 때마다 nodes 표를 최신으로
+  static unsigned long lastInfo = 0;
+  if (millis() - lastInfo >= 600000UL) {  // 10분마다 연결 상태 보고
+    lastInfo = millis();
+    sendInfo();
+  }
+  if (cloudNeedsRestart() && !pumpOn && !busy()) {
+    serialLine("# 10분 넘게 Supabase에 못 닿아서 다시 시작합니다");
+    delay(300);
+    ESP.restart();
+  }
   if (millis() - lastSample >= sampleMs) {
     lastSample = millis();
     sendData();

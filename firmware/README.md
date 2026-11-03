@@ -92,12 +92,16 @@ Arduino IDE → 왼쪽 책 아이콘(라이브러리 매니저) → 검색 → *
 | `Supabase 실패: ... DEVICE_KEY(기기 키) 확인` | `secrets.h`의 `DEVICE_KEY` (Supabase SQL Editor에서 `select value from private.secrets where name = 'device_key';`) |
 | `Supabase 실패: ... schema.sql 을 ... 다시 실행하세요` | 위 1번을 안 했음 |
 | `Supabase 실시간 연결 끊김` | 괜찮다. 2초마다 명령을 확인하며 스스로 다시 연결한다 |
+| `WiFi 끊김 (이유) — 다시 연결하는 중` | 스스로 다시 붙는다. 자주 나오면 공유기와 거리·전원(USB 케이블·충전기)을 본다 |
+| `3분 넘게 Supabase에 못 닿았어요 — WiFi를 다시 연결합니다` | WiFi는 붙었는데 인터넷이 안 될 때 스스로 다시 연결한다. 그래도 10분이 넘으면 `다시 시작합니다`가 나오고 재시작한다(펌프가 꺼져 있을 때만) |
 | 컴파일 오류 `secrets.h 가 없습니다` | `secrets.example.h`를 복사해 `secrets.h`로 저장하고 채운다 |
 | 컴파일 오류 `HX711.h` / `WebSocketsClient.h` / `ArduinoJson.h` 없음 | 2번 라이브러리 설치 (HX711은 Bogdan Necula 것) |
 | `온습도 A/B (SHT31) 못 찾음` | SDA 21·SCL 22·3.3V·GND 선. 둘 다 연결했다면 **B의 ADR 핀을 VIN(3.3V)에** (안 하면 둘 다 0x44라 B를 못 찾는다) |
 | 컴파일 오류 `Adafruit_SHT31.h` 없음 | 2번에서 Adafruit SHT31 Library 설치 |
 | 토양 값이 `null` | 그 센서의 mV가 150 미만(신호선 빠짐) 또는 3050 초과(GND 빠짐·단락) |
 | 무게 raw가 안 바뀜 | HX711 DT·SCK 선, 로드셀 4선 |
+
+**원격 진단**: 보드는 10분마다(그리고 WiFi에 다시 붙을 때마다) `info`에 `wifi_drops`(끊긴 횟수)·`wifi_reason`(마지막 끊김 이유 번호)·`net_fail`(HTTPS 실패 수)·`rt`(실시간 연결)·`heap`·`heap_min`(남은 메모리)·`up_s`(켜진 시간)를 실어 Supabase `nodes.info`와 `events`에 남긴다.
 
 ## USB로 노트북 서버에 붙이기 (예전 방식, 지금도 됨)
 ```bat
