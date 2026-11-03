@@ -82,7 +82,7 @@ function pushCapped<T>(list: T[], item: T, max: number, front = true): T[] {
 
 const LIVE_KINDS = new Set<string>(['evt', 'water_result', 'mark', 'diag_on', 'diag_off'])
 
-function toLiveEvent(row: EventRow): LiveEvent | null {
+export function toLiveEvent(row: EventRow): LiveEvent | null {
   if (!LIVE_KINDS.has(row.t)) return null
   return {
     id: `ev-${row.id}`,

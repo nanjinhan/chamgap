@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useShallow } from 'zustand/react/shallow'
 import { zoneIds, zoneProfile } from '@/config/zones'
 import { useFreshness, useNode } from '@/hooks/useNode'
+import { kindState, values } from '@/lib/readings'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/useAppStore'
 import { toast } from '@/store/useToasts'
@@ -51,13 +52,8 @@ function MetricBlock({ m, dim, className }: { m: Metric; dim: boolean; className
 }
 
 function metrics(node: NodeState | undefined): Record<'temp' | 'rh' | 'soil' | 'weight', Metric> {
-  const d = node?.latest
-  const s = node?.sensors
-  const absent = (k: keyof NodeState['sensors']) => (s && !s[k].present ? '미설치' : undefined)
-  const temp = num(d?.temp_a) ? d.temp_a : null
-  const rh = num(d?.rh_a) ? d.rh_a : null
-  const soil = num(d?.soil_a) ? d.soil_a : null
-  const w = num(d?.weight_g) ? d.weight_g : null
+  const { temp, rh, soil, weightG: w } = values(node?.latest)
+  const soilState = kindState(node, 'soil')
   return {
     temp: {
       label: '온도',
@@ -65,7 +61,7 @@ function metrics(node: NodeState | undefined): Record<'temp' | 'rh' | 'soil' | '
       frac: temp == null ? null : clamp01((temp - 10) / 30),
       min: '10°',
       max: '40°',
-      note: absent('sht_a'),
+      note: node && !kindState(node, 'climate').present ? '미설치' : undefined,
     },
     rh: {
       label: '습도',
@@ -73,7 +69,7 @@ function metrics(node: NodeState | undefined): Record<'temp' | 'rh' | 'soil' | '
       frac: rh == null ? null : clamp01(rh / 100),
       min: '0%',
       max: '100%',
-      note: absent('sht_a'),
+      note: node && !kindState(node, 'climate').present ? '미설치' : undefined,
     },
     soil: {
       label: '토양 수분',
@@ -81,7 +77,7 @@ function metrics(node: NodeState | undefined): Record<'temp' | 'rh' | 'soil' | '
       frac: soil == null ? null : clamp01(soil),
       min: '0',
       max: '1',
-      note: absent('soil_a') ?? (node?.info?.soil_a_cal === 0 ? '보정 전' : undefined),
+      note: !node ? undefined : !soilState.present ? '미설치' : soilState.status === 'info' ? '보정 전' : undefined,
     },
     weight: {
       label: '무게',
@@ -90,7 +86,7 @@ function metrics(node: NodeState | undefined): Record<'temp' | 'rh' | 'soil' | '
       frac: w == null ? null : clamp01(w / 3000),
       min: '0',
       max: '3,000',
-      note: absent('scale'),
+      note: node && !kindState(node, 'weight').present ? '미설치' : undefined,
     },
   }
 }
@@ -121,7 +117,7 @@ function ZoneDock({ ids, active, onPick }: { ids: NodeId[]; active: NodeId; onPi
       {ids.slice(0, 3).map((id) => {
         const p = zoneProfile(id)
         const on = id === active
-        const soil = nodes[id]?.latest?.soil_a
+        const soil = values(nodes[id]?.latest).soil
         const ring = on ? (num(soil) ? clamp01(soil) : 1) : 0
         const inner = on ? 64 : 70
         return (

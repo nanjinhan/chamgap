@@ -11,7 +11,6 @@ const WaterPage = lazy(() => import('@/features/water/WaterPage'))
 const DiagnosticsPage = lazy(() => import('@/features/diagnostics/DiagnosticsPage'))
 const CalibratePage = lazy(() => import('@/features/calibrate/CalibratePage'))
 const HistoryPage = lazy(() => import('@/features/history/HistoryPage'))
-const TestPage = lazy(() => import('@/features/test/TestPage'))
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'))
 // 개발용 데모: 빌드(production)에서는 이 import가 통째로 빠진다
 const FxDemoPage = import.meta.env.DEV ? lazy(() => import('@/features/dev/FxDemoPage')) : null
@@ -22,7 +21,7 @@ function Page({ children }: { children: ReactNode }) {
 
 function CalibrateDefault() {
   const { node } = useParams()
-  return <Navigate to={`/calibrate/${node ?? 'Z1'}/scale`} replace />
+  return <Navigate to={`/calibrate/${node ?? 'Z1'}/soil`} replace />
 }
 
 export const router = createBrowserRouter([
@@ -85,14 +84,6 @@ export const router = createBrowserRouter([
         element: (
           <Page>
             <HistoryPage />
-          </Page>
-        ),
-      },
-      {
-        path: 'test',
-        element: (
-          <Page>
-            <TestPage />
           </Page>
         ),
       },

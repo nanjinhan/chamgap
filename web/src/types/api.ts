@@ -178,6 +178,14 @@ export interface InfoMsg extends Extra {
   soil_b_present?: Bit
   hx_present?: Bit
   pump_present?: Bit
+  // 연결 상태 (펌웨어 node-2.1, 10분마다 · WiFi에 다시 붙을 때)
+  wifi_drops?: number
+  wifi_reason?: number
+  net_fail?: number
+  rt?: Bit
+  heap?: number
+  heap_min?: number
+  up_s?: number
 }
 
 // ------------------------------------------------------------ 진단 (6.2, 진단 서버가 diagnostics 표에 쓴다)
