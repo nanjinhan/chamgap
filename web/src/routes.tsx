@@ -62,6 +62,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: 'water/:node/:view',
+        element: (
+          <Page>
+            <WaterPage />
+          </Page>
+        ),
+      },
+      {
         path: 'diagnostics',
         element: (
           <Page>

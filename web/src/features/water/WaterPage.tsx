@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useShallow } from 'zustand/react/shallow'
 import { ArrowRight, ChevronRight, Clock, Droplet, GlassWater, Scale, Square } from 'lucide-react'
 import {
@@ -20,10 +20,11 @@ import { hm, kstDay } from '@/lib/history'
 import { parseTs } from '@/lib/nodeState'
 import { waterPrecheck } from '@/lib/precheck'
 import { clamp01, fmt, isNum, values } from '@/lib/readings'
+import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/useAppStore'
 import { toast } from '@/store/useToasts'
-import type { NodeId, NodeState, Severity } from '@/types/api'
+import type { EventRow, NodeId, NodeState, Severity } from '@/types/api'
 
 const AMOUNTS = [10, 20, 30, 40, 50] // 1회 최대 50mL (펌웨어 MAX_ML_PER_SHOT)
 
@@ -219,6 +220,17 @@ function ControlView({
         </div>
       </div>
       <div className="relative mt-3 space-y-3 lg:mt-24">
+        {node?.pump.on ? (
+          <Link
+            to={`/water/${id}/now`}
+            className="flex items-center justify-between rounded-[16px] border border-[#c7e88f]/50 bg-[#3a4630]/70 px-4 py-3 text-[14px]"
+          >
+            <StatusLabel status="ok" text="지금 급수 중이에요" className="text-[14px] text-white" />
+            <span className="inline-flex items-center text-[13px]">
+              진행 보기 <ChevronRight size={15} strokeWidth={1.6} />
+            </span>
+          </Link>
+        ) : null}
         <section
           aria-label="오늘 급수량"
           className="flex items-center justify-between gap-3 rounded-[24px] border border-white/25 bg-white/[0.12] px-6 py-5 backdrop-blur-xl"
@@ -281,6 +293,20 @@ function ControlView({
           <Droplet size={20} strokeWidth={2} fill="currentColor" aria-hidden />
           급수 시작하기
         </HoldButton>
+        <div className="grid grid-cols-2 gap-2">
+          <Link
+            to={`/water/${id}/now`}
+            className="flex h-[44px] items-center justify-center gap-1 rounded-full border border-white/15 bg-white/[0.06] text-[13.5px]"
+          >
+            급수 상태 <ChevronRight size={15} strokeWidth={1.6} aria-hidden />
+          </Link>
+          <Link
+            to={`/water/${id}/result`}
+            className="flex h-[44px] items-center justify-center gap-1 rounded-full border border-white/15 bg-white/[0.06] text-[13.5px]"
+          >
+            지난 급수 결과 <ChevronRight size={15} strokeWidth={1.6} aria-hidden />
+          </Link>
+        </div>
         <p className="text-center text-[11px] text-ds-text-3">
           최종 확인은 ESP32가 합니다 · 하드웨어 비상정지 스위치가 이 화면보다 항상 우선입니다
         </p>
@@ -289,7 +315,7 @@ function ControlView({
   )
 }
 
-// ------------------------------------------------------------ 08 급수 중
+// ------------------------------------------------------------ 08 급수 상태 (언제든: 평소엔 대기, 펌프가 돌면 진행)
 
 function WaterLog({ id }: { id: NodeId }) {
   const list = useAppStore(
@@ -299,7 +325,7 @@ function WaterLog({ id }: { id: NodeId }) {
   )
   return (
     <Panel aria-label="최근 급수 기록">
-      <PanelHeader title="최근 급수 기록" to={`/history/${id}`} more="전체 보기" />
+      <PanelHeader title="최근 급수 기록" to={`/water/${id}/result`} more="지난 결과" />
       {list.length === 0 ? (
         <p className="py-3 text-center text-[13px] text-ds-text-3">아직 급수 기록이 없어요</p>
       ) : (
@@ -324,15 +350,26 @@ function WaterLog({ id }: { id: NodeId }) {
   )
 }
 
-function RunningView({ id, node }: { id: NodeId; node: NodeState | undefined }) {
+function StatusView({ id }: { id: NodeId }) {
   const now = useNow()
+  const navigate = useNavigate()
+  const node = useNode(id)
   const p = zoneProfile(id)
   const pump = node?.pump
+  const running = !!pump?.on
+  const noPump = node ? !node.sensors.pump.present : false
+  // 이 화면을 보는 동안 펌프가 돌다가 멈추면 결과 화면으로 넘어간다
+  const [sawRunning, setSawRunning] = useState(running)
+  if (running && !sawRunning) setSawRunning(true)
+  useEffect(() => {
+    if (sawRunning && !running) navigate(`/water/${id}/result`, { replace: true })
+  }, [sawRunning, running, id, navigate])
+
   const start = parseTs(pump?.started_at)
   const dur = pump?.dur ?? 0
-  const k = dur > 0 && Number.isFinite(start) ? clamp01((now - start) / dur) : 0
-  const ml = pump?.ml ?? null
-  const left = dur > 0 ? Math.max(0, Math.ceil((start + dur - now) / 1000)) : null
+  const k = running && dur > 0 && Number.isFinite(start) ? clamp01((now - start) / dur) : 0
+  const ml = running ? (pump?.ml ?? null) : null
+  const left = running && dur > 0 ? Math.max(0, Math.ceil((start + dur - now) / 1000)) : null
   const R = 120
   const C = 2 * Math.PI * R
   const angle = k * 2 * Math.PI - Math.PI / 2
@@ -341,35 +378,54 @@ function RunningView({ id, node }: { id: NodeId; node: NodeState | undefined }) 
     if (r.ok) toast.ok('급수를 멈췄어요')
     else toast.error('정지가 확인되지 않았어요', r.message)
   }
+  const pumpText = noPump ? '펌프 미설치' : running ? '펌프 작동 중' : '펌프 대기'
   return (
     <div className="lg:grid lg:grid-cols-2 lg:gap-10">
       <div>
-        <div className="mt-6">
+        <div className="mt-6 pl-2">
           <h1 className="text-[26px] font-semibold">
             {id} <span className="ml-1">{p.name}</span>
           </h1>
-          <p className="mt-1 text-[14px] text-ds-text-2">급수가 진행되고 있어요.</p>
+          <p className="mt-1 text-[14px] text-ds-text-2">
+            {running ? '급수가 진행되고 있어요.' : '지금은 급수하고 있지 않아요.'}
+          </p>
         </div>
-        <div className="relative mx-auto mt-6 size-[280px]" role="img" aria-label={`급수 ${Math.round(k * 100)}% 진행`}>
+        <div
+          className="relative mx-auto mt-6 size-[280px]"
+          role="img"
+          aria-label={running ? `급수 ${Math.round(k * 100)}% 진행` : '급수 대기 중'}
+        >
           <svg viewBox="0 0 280 280" className="absolute inset-0">
             <circle cx="140" cy="140" r="136" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.12)" />
             <circle cx="140" cy="140" r={R} fill="none" stroke="rgba(255,255,255,.12)" strokeWidth="14" />
-            <circle
-              cx="140"
-              cy="140"
-              r={R}
-              fill="none"
-              stroke="var(--ds-lime)"
-              strokeWidth="14"
-              strokeLinecap="round"
-              strokeDasharray={`${k * C} ${C}`}
-              transform="rotate(-90 140 140)"
-            />
-            <circle cx={140 + R * Math.cos(angle)} cy={140 + R * Math.sin(angle)} r="11" fill="#fff" />
+            {running ? (
+              <>
+                <circle
+                  cx="140"
+                  cy="140"
+                  r={R}
+                  fill="none"
+                  stroke="var(--ds-lime)"
+                  strokeWidth="14"
+                  strokeLinecap="round"
+                  strokeDasharray={`${k * C} ${C}`}
+                  transform="rotate(-90 140 140)"
+                />
+                <circle cx={140 + R * Math.cos(angle)} cy={140 + R * Math.sin(angle)} r="11" fill="#fff" />
+              </>
+            ) : null}
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <Droplet size={30} strokeWidth={1.4} className="fill-white/70 text-white/80" aria-hidden />
-            {ml != null ? (
+            {!running ? (
+              <>
+                <div className="mt-2 text-[34px] leading-none font-semibold">대기 중</div>
+                <div className="mt-2 text-[14px] text-ds-text-2">
+                  오늘 {Math.round(pump?.today_ml ?? 0)} /{' '}
+                  {isNum(node?.info?.day_limit_ml) ? node.info.day_limit_ml : 300} mL
+                </div>
+              </>
+            ) : ml != null ? (
               <>
                 <div className="num mt-1 text-[58px] leading-none font-semibold">
                   {Math.round(ml * k)}
@@ -383,17 +439,27 @@ function RunningView({ id, node }: { id: NodeId; node: NodeState | undefined }) 
           </div>
         </div>
         <div className="mt-5 flex justify-center">
-          <GhostButton onClick={stop} className="w-[240px]">
-            <Square size={14} fill="currentColor" aria-hidden />
-            급수 중지하기
-          </GhostButton>
+          {running ? (
+            <GhostButton onClick={stop} className="w-[240px]">
+              <Square size={14} fill="currentColor" aria-hidden />
+              급수 중지하기
+            </GhostButton>
+          ) : (
+            <LimeButton to={`/water/${id}`} className="w-[240px]">
+              <Droplet size={18} strokeWidth={2} fill="currentColor" aria-hidden />
+              급수하러 가기
+            </LimeButton>
+          )}
         </div>
       </div>
       <div className="mt-6 space-y-3 lg:mt-24">
         <div className="grid grid-cols-3 divide-x divide-white/15 border-t border-white/15 py-4">
           <div className="flex items-center gap-2 px-2">
-            <span className="text-[13px]">펌프 작동 중</span>
-            <span className="size-[11px] rounded-full bg-[var(--ds-chart)]" aria-hidden />
+            <span className="text-[13px]">{pumpText}</span>
+            <span
+              className={cn('size-[11px] shrink-0 rounded-full', running ? 'bg-[var(--ds-chart)]' : 'bg-white/35')}
+              aria-hidden
+            />
           </div>
           <div className="flex items-center gap-2 px-3">
             <Clock size={24} strokeWidth={1.3} aria-hidden />
@@ -416,43 +482,106 @@ function RunningView({ id, node }: { id: NodeId; node: NodeState | undefined }) 
   )
 }
 
-// ------------------------------------------------------------ 09 급수 완료
+// ------------------------------------------------------------ 09 급수 결과 (언제든: 마지막 급수)
 
-type Session = { ml: number | null; beforeG: number | null; beforeAt: string | null }
+type Weight = { g: number; at: string }
+type LastWatering = { on: EventRow | null; off: EventRow; before: Weight | null; after: Weight | null }
 
-function DoneView({
-  id,
-  node,
-  session,
-  onAgain,
-}: {
-  id: NodeId
-  node: NodeState | undefined
-  session: Session
-  onAgain: () => void
-}) {
-  const off = useAppStore((s) => s.parts[id]?.pumpOff ?? null)
-  const on = useAppStore((s) => s.parts[id]?.pumpOn ?? null)
+/** Supabase에서 마지막 급수(펌프 꺼짐)와 그 앞 켜짐, 앞뒤 무게를 찾는다. 새 급수가 끝나면 다시 찾는다 */
+function useLastWatering(id: NodeId): LastWatering | null | undefined {
+  const [state, setState] = useState<LastWatering | null | undefined>(undefined)
+  const offId = useAppStore((s) => s.parts[id]?.pumpOff?.id ?? null)
+  const hasAfter = state ? state.after != null : true
+  useEffect(() => {
+    if (!supabase) return
+    const db = supabase
+    let alive = true
+    const load = async () => {
+      const { data } = await db
+        .from('events')
+        .select('*')
+        .eq('node', id)
+        .eq('t', 'evt')
+        .in('ev', ['pump_on', 'pump_off'])
+        .order('created_at', { ascending: false })
+        .limit(20)
+        .returns<EventRow[]>()
+      const rows = data ?? []
+      const off = rows.find((r) => r.ev === 'pump_off')
+      if (!off) {
+        if (alive) setState(null)
+        return
+      }
+      const offAt = parseTs(off.created_at)
+      const on =
+        rows.find(
+          (r) => r.ev === 'pump_on' && parseTs(r.created_at) <= offAt && offAt - parseTs(r.created_at) < 60_000,
+        ) ?? null
+      const weightNear = async (ascending: boolean, at: string) => {
+        let q = db.from('readings').select('created_at,weight_g').eq('node', id).not('weight_g', 'is', null)
+        q = ascending ? q.gte('created_at', at) : q.lt('created_at', at)
+        const { data: w } = await q.order('created_at', { ascending }).limit(1)
+        const r = (w as { created_at: string; weight_g: number }[] | null)?.[0]
+        return r ? { g: r.weight_g, at: r.created_at } : null
+      }
+      const before = await weightNear(false, (on ?? off).created_at)
+      // 물이 다 떨어지도록 꺼지고 3초 뒤부터의 첫 값
+      const after = await weightNear(true, new Date(offAt + 3000).toISOString())
+      if (alive) setState({ on, off, before, after: after && parseTs(after.at) - offAt < 10 * 60_000 ? after : null })
+    }
+    void load()
+    // 급수 직후에는 '급수 후' 무게가 아직 없을 수 있어 잠깐 더 찾는다
+    const t = hasAfter ? null : setInterval(() => void load(), 10_000)
+    return () => {
+      alive = false
+      if (t) clearInterval(t)
+    }
+  }, [id, offId, hasAfter])
+  return state
+}
+
+function ResultView({ id }: { id: NodeId }) {
+  const now = useNow()
+  const node = useNode(id)
+  const last = useLastWatering(id)
   const result = useAppStore((s) => s.lastWater[id])
-  const reason = String(off?.payload.reason ?? 'done')
-  const ok = reason === 'done'
-  const requested = session.ml ?? (typeof on?.payload.ml === 'number' ? on.payload.ml : null)
-  const actual = typeof off?.payload.ml === 'number' ? off.payload.ml : null
   const scale = node?.sensors.scale.present ?? false
-  // 급수 전 무게: 펌프가 켜지기 직전 측정값 (다른 기기에서 시작한 급수도), 없으면 이 화면에서 시작할 때 값
-  const recent = useAppStore((s) => s.recent[id])
-  const onAt = on ? parseTs(on.created_at) : null
-  const beforeMsg =
-    onAt == null
-      ? undefined
-      : [...(recent ?? [])].reverse().find((d) => parseTs(d.created_at) < onAt && isNum(d.weight_g))
-  const beforeG = beforeMsg && isNum(beforeMsg.weight_g) ? beforeMsg.weight_g : session.beforeG
-  const beforeAt = beforeMsg?.created_at ?? session.beforeAt
-  const after =
-    node?.latest && off && parseTs(node.latest.created_at) > parseTs(off.created_at) + 2000 ? node.latest : null
-  const afterG = after && isNum(after.weight_g) ? after.weight_g : null
-  const delta = afterG != null && beforeG != null ? afterG - beforeG : null
-  const offAt = off ? parseTs(off.created_at) : null
+
+  if (last === undefined) return <p className="mt-10 text-center text-[14px] text-ds-text-2">불러오는 중…</p>
+  if (last === null) {
+    return (
+      <div className="relative">
+        <CornerPlant
+          src="/design/leaves-top.jpg"
+          className="-top-[64px] -right-4 h-[300px] w-[60%] opacity-85 lg:right-0"
+        />
+        <div className="relative mt-7 pl-2">
+          <div className="text-[13px] tracking-[0.1em] text-ds-text-3">WATERING RESULT</div>
+          <h1 className="mt-2 text-[34px] leading-[1.2] font-semibold">
+            아직 급수 기록이
+            <br />
+            없어요.
+          </h1>
+          <p className="mt-3 text-[14px] text-ds-text-2">급수를 한 번 하면 여기에 결과가 남아요.</p>
+          <div className="mt-6 max-w-[420px]">
+            <LimeButton to={`/water/${id}`}>
+              <Droplet size={18} strokeWidth={2} fill="currentColor" aria-hidden />
+              급수하러 가기
+            </LimeButton>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const { on, off, before, after } = last
+  const reason = String(off.payload.reason ?? 'done')
+  const ok = reason === 'done'
+  const requested = typeof on?.payload.ml === 'number' ? on.payload.ml : null
+  const actual = typeof off.payload.ml === 'number' ? off.payload.ml : null
+  const delta = before && after ? after.g - before.g : null
+  const offAt = parseTs(off.created_at)
+  const fresh = now - offAt < 10 * 60_000 // 방금 끝난 급수면 '급수 후' 무게를 기다리는 중
   return (
     <div className="relative">
       <CornerPlant
@@ -464,12 +593,12 @@ function DoneView({
           <div className="mt-7 pl-2 text-[13px] tracking-[0.1em] text-ds-text-3">
             {ok ? 'WATERING COMPLETE' : 'WATERING STOPPED'}
           </div>
-          <h1 className="mt-2 text-[36px] leading-[1.2] font-semibold">
+          <h1 className="mt-2 pl-2 text-[36px] leading-[1.2] font-semibold">
             급수가
             <br />
             {ok ? '완료되었어요.' : '멈췄어요.'}
           </h1>
-          <p className="mt-3 text-[14px] text-ds-text-2">
+          <p className="mt-3 pl-2 text-[14px] text-ds-text-2">
             {ok ? '펌프가 정해진 시간만큼 돌았어요.' : reasonText(reason) || '펌프가 중간에 멈췄어요.'}
           </p>
           <div className="mt-6">
@@ -480,9 +609,7 @@ function DoneView({
           <Panel aria-label="급수 결과" className="p-0">
             <div className="flex items-center justify-between border-b border-white/10 px-5 py-3.5">
               <h2 className="text-[16px] font-semibold">급수 결과</h2>
-              <span className="num text-[12.5px] text-ds-text-2">
-                {offAt ? `${kstDay(offAt).replace(/-/g, '. ')}  ${hm(offAt)}` : ''}
-              </span>
+              <span className="num text-[12.5px] text-ds-text-2">{`${kstDay(offAt).replace(/-/g, '. ')}  ${hm(offAt)}`}</span>
             </div>
             <div className="grid grid-cols-2 divide-x divide-white/10">
               <div className="flex items-center gap-3 px-5 py-4">
@@ -517,7 +644,13 @@ function DoneView({
                 <div>
                   <div className="text-[12px] text-ds-text-2">무게 변화</div>
                   <div className="num text-[19px] whitespace-nowrap">
-                    {!scale ? '--' : delta == null ? '재는 중…' : `${delta >= 0 ? '+' : ''}${delta.toFixed(1)} g`}
+                    {!scale
+                      ? '--'
+                      : delta != null
+                        ? `${delta >= 0 ? '+' : ''}${delta.toFixed(1)} g`
+                        : fresh
+                          ? '재는 중…'
+                          : '--'}
                   </div>
                   {!scale ? <div className="text-[10.5px] text-ds-text-3">무게 센서 미설치</div> : null}
                 </div>
@@ -553,15 +686,15 @@ function DoneView({
               <div className="flex items-center justify-around px-5 py-4 text-center">
                 <div>
                   <div className="text-[12.5px] text-[var(--ds-chart)]">급수 전</div>
-                  <div className="num text-[24px]">{beforeG == null ? '--' : `${beforeG.toFixed(1)} g`}</div>
-                  <div className="num text-[11.5px] text-ds-text-3">{beforeAt ? hm(parseTs(beforeAt)) : ''}</div>
+                  <div className="num text-[24px]">{before ? `${before.g.toFixed(1)} g` : '--'}</div>
+                  <div className="num text-[11.5px] text-ds-text-3">{before ? hm(parseTs(before.at)) : ''}</div>
                 </div>
                 <ArrowRight size={26} strokeWidth={1.4} className="text-[var(--ds-chart)]" aria-hidden />
                 <div>
                   <div className="text-[12.5px] text-[var(--ds-chart)]">급수 후</div>
-                  <div className="num text-[24px]">{afterG == null ? '--' : `${afterG.toFixed(1)} g`}</div>
+                  <div className="num text-[24px]">{after ? `${after.g.toFixed(1)} g` : '--'}</div>
                   <div className="num text-[11.5px] text-ds-text-3">
-                    {after ? hm(parseTs(after.created_at)) : '재는 중…'}
+                    {after ? hm(parseTs(after.at)) : fresh ? '재는 중…' : ''}
                   </div>
                 </div>
               </div>
@@ -571,7 +704,7 @@ function DoneView({
           </Panel>
           <div className="grid grid-cols-[1fr_1.4fr] gap-3">
             <GhostButton to="/">홈으로</GhostButton>
-            <LimeButton onClick={onAgain} className="h-[56px]">
+            <LimeButton to={`/water/${id}`} className="h-[56px]">
               <Droplet size={18} strokeWidth={2} fill="currentColor" aria-hidden />
               다시 급수하기
             </LimeButton>
@@ -582,54 +715,33 @@ function DoneView({
   )
 }
 
-// ------------------------------------------------------------ 한 구역 급수: 제어 → 진행 → 완료
+// ------------------------------------------------------------ 07 급수 제어 (시작하면 상태 화면으로)
 
-function WaterZone({ id }: { id: NodeId }) {
+function ControlZone({ id }: { id: NodeId }) {
   const node = useNode(id)
+  const navigate = useNavigate()
   const [ml, setMl] = useState(30)
-  const [phase, setPhase] = useState<'control' | 'starting' | 'running' | 'done'>(node?.pump.on ? 'running' : 'control')
-  const [session, setSession] = useState<Session>({ ml: null, beforeG: null, beforeAt: null })
-  const pumpOn = !!node?.pump.on
-
-  // 실제 펌프 상태로 화면을 바꾼다: 켜지면 진행, 진행 중에 꺼지면 완료 (값이 바뀔 때 렌더 중에 맞춘다)
-  const [prevPumpOn, setPrevPumpOn] = useState(pumpOn)
-  if (pumpOn !== prevPumpOn) {
-    setPrevPumpOn(pumpOn)
-    setPhase((p) => (pumpOn && p !== 'running' ? 'running' : !pumpOn && p === 'running' ? 'done' : p))
-  }
-
+  const [starting, setStarting] = useState(false)
   const start = async () => {
-    setPhase('starting')
-    setSession({
-      ml,
-      beforeG: isNum(node?.latest?.weight_g) ? node.latest.weight_g : null,
-      beforeAt: node?.latest?.created_at ?? null,
-    })
+    setStarting(true)
     const r = await sendCommand(id, `water ${ml}`)
+    setStarting(false)
     if (!r.ok) {
       toast.error('급수를 시작하지 못했어요', r.message)
-      setPhase('control')
       return
     }
-    setPhase((p) => (p === 'starting' ? 'running' : p)) // 펌프 켜짐 사건이 곧 따라온다
+    navigate(`/water/${id}/now`)
   }
-
-  if (phase === 'running') return <RunningView id={id} node={node} />
-  if (phase === 'done') return <DoneView id={id} node={node} session={session} onAgain={() => setPhase('control')} />
-  return (
-    <ControlView
-      id={id}
-      node={node}
-      ml={ml}
-      setMl={setMl}
-      onStart={() => void start()}
-      starting={phase === 'starting'}
-    />
-  )
+  return <ControlView id={id} node={node} ml={ml} setMl={setMl} onStart={() => void start()} starting={starting} />
 }
 
+/** /water: 화분 고르기, /water/Z1: 급수 제어, /water/Z1/now: 급수 상태, /water/Z1/result: 마지막 급수 결과 */
 export default function WaterPage() {
-  const { node } = useParams()
-  const id = useMemo(() => node?.toUpperCase(), [node])
-  return id ? <WaterZone key={id} id={id} /> : <WaterSelect />
+  const { node, view } = useParams()
+  if (!node) return <WaterSelect />
+  const id = node.toUpperCase()
+  if (view === 'now') return <StatusView key={id} id={id} />
+  if (view === 'result') return <ResultView key={id} id={id} />
+  if (view) return <Navigate to={`/water/${id}`} replace />
+  return <ControlZone key={id} id={id} />
 }

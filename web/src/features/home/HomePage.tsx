@@ -35,7 +35,12 @@ function MetricBlock({ m, dim, className, to }: { m: Metric; dim: boolean; class
       style={{ textShadow: 'var(--ds-shadow-text)' }}
     >
       <div className="text-[11.5px] text-ds-text-2">{m.label}</div>
-      <div className={cn('num mt-0.5 text-[29px] leading-[1.1] font-light tracking-[-0.01em]', dim && 'opacity-55')}>
+      <div
+        className={cn(
+          'num mt-0.5 text-[29px] leading-[1.1] font-light tracking-[-0.01em] whitespace-nowrap',
+          dim && 'opacity-55',
+        )}
+      >
         {m.value}
         {m.unit ? <span className="ml-0.5 text-[20px]">{m.unit}</span> : null}
       </div>
@@ -120,8 +125,18 @@ function Hero({ id }: { id: NodeId }) {
         to={`/zone/${id}/sensor/climate`}
         className="top-[39.5%] left-[26px] lg:left-[5%]"
       />
-      <MetricBlock m={m.soil} dim={dim} to={`/zone/${id}/sensor/soil`} className="top-[5.5%] left-[79.5%]" />
-      <MetricBlock m={m.weight} dim={dim} to={`/zone/${id}/sensor/weight`} className="top-[35.5%] left-[79.5%]" />
+      <MetricBlock
+        m={m.soil}
+        dim={dim}
+        to={`/zone/${id}/sensor/soil`}
+        className="top-[5.5%] right-[6px] w-[86px] min-w-0 lg:right-auto lg:left-[79.5%] lg:w-[25%] lg:min-w-[88px]"
+      />
+      <MetricBlock
+        m={m.weight}
+        dim={dim}
+        to={`/zone/${id}/sensor/weight`}
+        className="top-[35.5%] right-[6px] w-[86px] min-w-0 lg:right-auto lg:left-[79.5%] lg:w-[25%] lg:min-w-[88px]"
+      />
     </div>
   )
 }
@@ -209,6 +224,7 @@ function WaterCard({ id }: { id: NodeId }) {
   const today = node?.pump.today_ml ?? 0
   const limit = num(node?.info?.day_limit_ml) ? node.info.day_limit_ml : 300
   const noPump = node ? !node.sensors.pump.present : false
+  const running = !!node?.pump.on
   return (
     <section
       aria-label="오늘 급수량"
@@ -218,6 +234,9 @@ function WaterCard({ id }: { id: NodeId }) {
       <div className="min-w-0 flex-1">
         <div className="text-[12px] text-white/90">
           오늘 급수량{noPump ? <span className="ml-1 text-white/70">· 펌프 미설치</span> : null}
+          <Link to={`/water/${id}/now`} className="ml-2 text-white/80 underline-offset-2 hover:underline">
+            급수 상태 ›
+          </Link>
         </div>
         <div className="num mt-0.5 text-[22px] leading-tight font-light">
           <span className="font-semibold">{Math.round(today)}</span> / {limit} mL
@@ -230,11 +249,11 @@ function WaterCard({ id }: { id: NodeId }) {
         </div>
       </div>
       <Link
-        to={`/water/${id}`}
+        to={running ? `/water/${id}/now` : `/water/${id}`}
         className="flex h-[52px] shrink-0 items-center gap-5 rounded-full bg-ds-btn px-[22px] text-[14px] font-semibold text-ds-btn-ink shadow-[0_6px_16px_rgba(0,0,0,.08)]"
         style={{ textShadow: 'none' }}
       >
-        급수하기
+        {running ? '급수 중' : '급수하기'}
         <span aria-hidden className="text-[17px]">
           →
         </span>
