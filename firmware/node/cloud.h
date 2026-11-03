@@ -76,11 +76,11 @@ static String wifiReasonText(int r) {
     case WIFI_REASON_NO_AP_FOUND_W_COMPATIBLE_SECURITY:
     case WIFI_REASON_NO_AP_FOUND_IN_AUTHMODE_THRESHOLD:
     case WIFI_REASON_NO_AP_FOUND_IN_RSSI_THRESHOLD:
-      return "와이파이 이름을 못 찾았어요 — secrets.h 의 WIFI_SSID 와 2.4GHz 인지 확인";
+      return "와이파이가 사라졌어요 — 공유기 전원, 2.4GHz 인지 확인";
     case WIFI_REASON_AUTH_FAIL:
     case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
     case WIFI_REASON_HANDSHAKE_TIMEOUT:
-      return "비밀번호가 틀린 것 같아요 — secrets.h 의 WIFI_PASSWORD 확인";
+      return "비밀번호가 틀린 것 같아요 — secrets.h 의 그 와이파이 비밀번호 확인";
     case WIFI_REASON_BEACON_TIMEOUT:
       return "신호가 약하거나 공유기가 꺼졌어요";
     default:
@@ -90,6 +90,57 @@ static String wifiReasonText(int r) {
 
 static void onWifiEvent(WiFiEvent_t e, WiFiEventInfo_t info) {
   if (e == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) wifiReason = info.wifi_sta_disconnected.reason;
+}
+
+// 등록한 WiFi (secrets.h 의 ①②③). 예시 값("…와이파이_…")이나 빈 칸은 뺀다
+struct WifiCred {
+  const char* ssid;
+  const char* pass;
+};
+static WifiCred wifiList[3];
+static int wifiCount = 0;
+static int wifiTrying = -1;  // 지금 붙으려는 것 (-1: 없음)
+
+static void addWifi(const char* ssid, const char* pass) {
+  if (!ssid || !*ssid || strstr(ssid, "와이파이_") || wifiCount >= 3) return;
+  wifiList[wifiCount++] = {ssid, pass};
+}
+
+static String wifiNames() {
+  String s;
+  for (int k = 0; k < wifiCount; k++) s += String(k ? ", " : "") + wifiList[k].ssid;
+  return s;
+}
+
+// 주변을 훑어 등록한 WiFi 중 가장 센 곳에 붙기 시작한다 (결과는 cloudTask 가 지켜본다).
+// 하나도 안 보이면, 지금 보이는 WiFi 이름을 알려 준다 (secrets.h 에 그대로 옮겨 적으면 된다)
+static void wifiConnect() {
+  WiFi.disconnect();
+  int n = WiFi.scanNetworks();
+  int best = -1, bestRssi = -1000;
+  String seen;
+  int seenCount = 0;
+  for (int i = 0; i < n; i++) {
+    String s = WiFi.SSID(i);
+    for (int k = 0; k < wifiCount; k++) {
+      if (s == wifiList[k].ssid && WiFi.RSSI(i) > bestRssi) {
+        best = k;
+        bestRssi = WiFi.RSSI(i);
+      }
+    }
+    if (s.length() && seenCount < 8 && seen.indexOf("\"" + s + "\"") < 0) {
+      seen += String(seenCount++ ? ", " : "") + "\"" + s + "\"";
+    }
+  }
+  WiFi.scanDelete();
+  wifiTrying = best;
+  wifiReason = 0;
+  if (best < 0) {
+    cloudLog("등록한 WiFi(" + wifiNames() + ")가 안 보여요. 지금 보이는 2.4GHz WiFi: " + (seenCount ? seen : String("없음")));
+    return;
+  }
+  cloudLog(String("WiFi 연결 중: ") + wifiList[best].ssid + " (세기 " + bestRssi + "dBm)");
+  WiFi.begin(wifiList[best].ssid, wifiList[best].pass);
 }
 
 // ------------------------------------------------------------ REST (HTTPS)
@@ -234,9 +285,8 @@ static void rtStart() {
 static void cloudTask(void*) {
   WiFi.onEvent(onWifiEvent);
   WiFi.mode(WIFI_STA);
-  WiFi.setAutoReconnect(true);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  cloudLog(String("WiFi 연결 중: ") + WIFI_SSID);
+  WiFi.setAutoReconnect(true);  // 붙었던 곳이 잠깐 끊기면 스스로 다시 붙는다
+  wifiConnect();
   tls.setInsecure();  // FW-14: 처음에는 인증서 확인 없이
   http.setReuse(true);
   http.setTimeout(6000);
@@ -249,7 +299,7 @@ static void cloudTask(void*) {
     if (up && !wifiUp) {
       wifiUp = true;
       rssiNow = WiFi.RSSI();
-      cloudLog("WiFi 연결됨 · IP " + WiFi.localIP().toString() + " · 세기 " + String(WiFi.RSSI()) + "dBm");
+      cloudLog("WiFi 연결됨: " + WiFi.SSID() + " · IP " + WiFi.localIP().toString() + " · 세기 " + String(WiFi.RSSI()) + "dBm");
       if (!timeSet) {
         configTzTime("KST-9", "pool.ntp.org", "time.google.com", "kr.pool.ntp.org");  // FW-12 한국 시간
         timeSet = true;
@@ -266,11 +316,10 @@ static void cloudTask(void*) {
     }
 
     if (!up) {
-      if (millis() - lastTry > 15000) {
+      if (millis() - lastTry > 15000) {  // 15초마다 다시 훑어서 붙는다 (장소를 옮겨도 된다)
         lastTry = millis();
-        cloudLog("WiFi 아직 연결 안 됨: " + wifiReasonText(wifiReason));
-        WiFi.disconnect();
-        WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+        if (wifiTrying >= 0) cloudLog(String("WiFi ") + wifiList[wifiTrying].ssid + " 연결 실패: " + wifiReasonText(wifiReason));
+        wifiConnect();
       }
       // 끊긴 동안에도 줄은 비운다: 측정값은 버리고, 사건·결과는 연결되면 보내려고 남긴다
       CloudOut o;
@@ -314,12 +363,18 @@ static void cloudTask(void*) {
 // ------------------------------------------------------------ 본 루프에서 쓰는 것
 
 bool cloudReady() {
-  return strcmp(WIFI_SSID, "와이파이_이름") != 0 && strncmp(DEVICE_KEY, "여기에", 9) != 0 &&
-         strstr(SUPABASE_URL, "xxxxxxxx") == nullptr;
+  return wifiCount > 0 && strncmp(DEVICE_KEY, "여기에", 9) != 0 && strstr(SUPABASE_URL, "xxxxxxxx") == nullptr;
 }
 
 void cloudBegin(const String& node) {
   strlcpy(cloudNode, node.c_str(), sizeof cloudNode);
+  addWifi(WIFI_SSID, WIFI_PASSWORD);
+#ifdef WIFI_SSID2
+  addWifi(WIFI_SSID2, WIFI_PASSWORD2);
+#endif
+#ifdef WIFI_SSID3
+  addWifi(WIFI_SSID3, WIFI_PASSWORD3);
+#endif
   if (!cloudReady()) {
     serialLine("# secrets.h 를 아직 안 채워서 WiFi·Supabase 없이 시작합니다 (USB로만 동작)");
     return;

@@ -9,10 +9,11 @@
 #define USE_CLOUD 1
 
 // ===== 지금 꽂은 센서 (있으면 1, 없으면 0) =====
+// 2026-11-03: 쇼트로 다른 센서를 빼고 토양 A(32번) 하나만 꽂음. 나머지는 고친 뒤 여기서 1로 켜면 된다
 // 온습도 A·B: SHT31 두 개를 같은 선(I2C SDA 21, SCL 22)에 (라이브러리 "Adafruit SHT31 Library" 필요)
 // 두 개를 구분하려면 주소가 달라야 한다: A는 ADR 핀을 GND(또는 비움) → 0x44, B는 ADR 핀을 VIN(3.3V) → 0x45
-#define USE_SHT31_A 1
-#define USE_SHT31_B 1
+#define USE_SHT31_A 0
+#define USE_SHT31_B 0
 
 // (예전 임시) 온습도 A 자리에 DHT11을 쓸 때만: USE_DHT11_A 1, USE_SHT31_A 0
 #define USE_DHT11_A 0
@@ -21,16 +22,16 @@
 // 토양수분 SEN0193 (ADC1 핀만: 32~39)
 #define USE_SOIL_A 1
 #define SOIL_A_PIN 32
-#define USE_SOIL_B 1
+#define USE_SOIL_B 0
 #define SOIL_B_PIN 33
 
 // 로드셀 + HX711
-#define USE_HX711 1
+#define USE_HX711 0
 #define HX_DOUT_PIN 26
 #define HX_SCK_PIN 27
 
 // 펌프 (DFR0457). 펌프를 안 달았어도 GPIO25가 켜졌다 꺼질 뿐 안전하다
-#define USE_PUMP 1
+#define USE_PUMP 0
 #define PUMP_PIN 25
 
 // 12V 감지(분압 47k/10k)와 누수 센서 — 아직 안 달았으면 0

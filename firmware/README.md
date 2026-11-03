@@ -9,17 +9,19 @@ USB 시리얼 출력도 예전과 똑같이 나오므로, 시리얼 모니터나
 | `node.ino` | 센서·펌프·명령 (본 루프) | — |
 | `cloud.h` | WiFi·Supabase 연결 (코어 0의 별도 작업. 네트워크가 느려도 펌프는 제시간에 꺼짐) | — |
 | `config.h` | 구역 이름, 어떤 센서를 꽂았는지, 핀 번호, 안전 한도 | 보드마다 |
-| `secrets.h` | WiFi 이름·비밀번호, Supabase 주소·공개 키, 기기 키 (**GitHub에 안 올라감**) | 사용자 |
+| `secrets.h` | WiFi 이름·비밀번호(**최대 3곳**: 학교·집 등), Supabase 주소·공개 키, 기기 키 (**GitHub에 안 올라감**) | 사용자 |
 | `secrets.example.h` | `secrets.h`의 틀 | — |
 
 지금 지원하는 센서 (`config.h`에서 켜고 끔)
+
+> **지금 설정 (2026-11-03): 토양 A(32번) 하나만 켬.** 쇼트로 다른 센서를 빼 두었다. SHT31·HX711·펌프는 다시 달면 `config.h`에서 1로 켠다.
 | 센서 | 설정 | 기본 핀 |
 |---|---|---|
-| 온습도 A·B — **SHT31 두 개** (지금 설정) | `USE_SHT31_A 1`, `USE_SHT31_B 1` | 둘 다 SDA 21, SCL 22. **A는 ADR→GND(0x44), B는 ADR→VIN(0x45)** |
+| 온습도 A·B — SHT31 두 개 (지금 0) | `USE_SHT31_A`, `USE_SHT31_B` | 둘 다 SDA 21, SCL 22. **A는 ADR→GND(0x44), B는 ADR→VIN(0x45)** |
 | 온습도 A — DHT11 (예전 임시) | `USE_DHT11_A` (지금 0) | `DHT_PIN 4` |
-| 토양수분 A·B (SEN0193) | `USE_SOIL_A`, `USE_SOIL_B` | 32, 33 |
-| 로드셀 + HX711 | `USE_HX711` | DT 26, SCK 27 |
-| 펌프 (DFR0457) | `USE_PUMP` | 25 |
+| 토양수분 A·B (SEN0193) | `USE_SOIL_A` (**지금 1**), `USE_SOIL_B` (지금 0) | 32, 33. 선: VCC→3.3V, GND→GND, 신호(AOUT)→32 |
+| 로드셀 + HX711 | `USE_HX711` (지금 0) | DT 26, SCK 27 |
+| 펌프 (DFR0457) | `USE_PUMP` (지금 0) | 25 |
 | 12V 감지 / 누수 | `USE_V12_SENSE`, `USE_LEAK` | 34 / 35 (지금은 0) |
 
 WiFi 없이 USB로만 쓰려면 `config.h`에서 `USE_CLOUD 0`.
@@ -39,11 +41,13 @@ Arduino IDE → 왼쪽 책 아이콘(라이브러리 매니저) → 검색 → *
 | `ArduinoJson` | **ArduinoJson** · Benoit Blanchon (7.x) |
 | `DHT sensor library` | (DHT11을 쓸 때만) **DHT sensor library** · Adafruit |
 
+**지금 설정(토양 A만)에 꼭 필요한 것은 WebSockets와 ArduinoJson 두 개뿐**이다. HX711·SHT31·DHT는 그 센서를 켤 때 설치한다.
+
 보드: 도구 → 보드 → esp32 → **ESP32 Dev Module** (esp32 보드 패키지 3.x)
 
 ## 3. 올리기
 1. Arduino IDE에서 `firmware/node/node.ino`를 연다 (`cloud.h`·`config.h`·`secrets.h`가 옆 탭에 같이 열린다).
-2. `secrets.h`에 WiFi 이름·비밀번호, `DEVICE_KEY`가 들어 있는지 본다. (`SUPABASE_URL`, `SUPABASE_KEY`는 채워져 있다)
+2. `secrets.h`에 WiFi(① 학교 ② 집 ③ 예비) 이름·비밀번호와 `DEVICE_KEY`가 들어 있는지 본다. 보드는 켜질 때 주변을 훑어 **적어 둔 곳 중 보이는 가장 센 WiFi**에 붙는다 → 장소를 옮겨도 다시 올릴 필요 없다. 안 쓰는 칸은 예시 값 그대로 두면 된다. (`SUPABASE_URL`, `SUPABASE_KEY`는 채워져 있다)
 3. `config.h`의 센서 켜고 끄기(`USE_...`)와 핀이 실제 배선과 같은지 본다.
 4. 도구 → 포트에서 ESP32 포트(COM 번호)를 고르고 **업로드(→ 버튼)**.
 5. 시리얼 모니터를 **115200**으로 열면 이런 순서로 나온다.
@@ -51,8 +55,8 @@ Arduino IDE → 왼쪽 책 아이콘(라이브러리 매니저) → 검색 → *
    # 참값 노드 시작 node-2.1 · 구역 Z1
    # 온습도 A (SHT31, 0x44) 찾음
    # 온습도 B (SHT31, 0x45) 찾음
-   # WiFi 연결 중: (와이파이 이름)
-   # WiFi 연결됨 · IP 192.168.0.23 · 세기 -55dBm
+   # WiFi 연결 중: (와이파이 이름) (세기 -55dBm)
+   # WiFi 연결됨: (와이파이 이름) · IP 192.168.0.23 · 세기 -55dBm
    # Supabase 실시간 명령 연결됨
    # 시각 맞춤(NTP) 완료 · 오늘 20261023 · 오늘 급수 0.0mL
    {"t":"data","node":"Z1","ms":20111,"seq":4,...,"rssi":-55}
@@ -82,8 +86,8 @@ Arduino IDE → 왼쪽 책 아이콘(라이브러리 매니저) → 검색 → *
 ## 문제 해결 (시리얼 모니터의 `#` 줄을 본다)
 | 나오는 말 | 확인할 것 |
 |---|---|
-| `와이파이 이름을 못 찾았어요` | `WIFI_SSID` 철자, 공유기가 **2.4GHz**인지 (ESP32는 5GHz 안 됨) |
-| `비밀번호가 틀린 것 같아요` | `WIFI_PASSWORD` |
+| `등록한 WiFi(…)가 안 보여요. 지금 보이는 2.4GHz WiFi: "A", "B"` | 보이는 목록에서 쓸 WiFi 이름을 **그대로 복사해** `secrets.h`에 적는다 (띄어쓰기·대소문자까지). 목록에 없으면 5GHz 전용이거나 너무 멀다 (공유기 이름이 `xxx`와 `xxx_5G` 두 개면 `_5G` 없는 쪽) |
+| `WiFi (이름) 연결 실패: 비밀번호가 틀린 것 같아요` | `secrets.h`에서 그 WiFi의 비밀번호 |
 | `Supabase 실패: ... SUPABASE_KEY(공개 키) 확인` | `secrets.h`의 `SUPABASE_KEY` |
 | `Supabase 실패: ... DEVICE_KEY(기기 키) 확인` | `secrets.h`의 `DEVICE_KEY` (Supabase SQL Editor에서 `select value from private.secrets where name = 'device_key';`) |
 | `Supabase 실패: ... schema.sql 을 ... 다시 실행하세요` | 위 1번을 안 했음 |
@@ -103,6 +107,6 @@ run_server.bat --mode serial
 시리얼 모니터는 닫는다 (열려 있으면 서버가 포트를 못 연다). 펌웨어를 다시 올릴 때는 서버를 먼저 끈다 (Ctrl+C).
 
 ## 확인한 것 / 못 한 것
-- 이 노트북의 arduino-cli(ESP32 core 3.3.11, WebSockets 2.7.2, ArduinoJson 7.4.3, HX711 Arduino Library 0.7.5, Adafruit SHT31 2.2.2, DHT 1.4.7)로 **컴파일 통과** (지금 설정 SHT31 A·B: 보드 저장공간 90%). `USE_CLOUD 0`, DHT11, SHT31 + 12V + 누수 켠 설정도 컴파일 통과.
+- 이 노트북의 arduino-cli(ESP32 core 3.3.11, WebSockets 2.7.2, ArduinoJson 7.4.3, HX711 Arduino Library 0.7.5, Adafruit SHT31 2.2.2, DHT 1.4.7)로 **컴파일 통과** (지금 설정 SHT31 A·B + WiFi 3곳: 보드 저장공간 91%). WiFi 칸이 하나뿐인 예전 `secrets.h`도 그대로 컴파일된다. `USE_CLOUD 0`, DHT11, SHT31 + 12V + 누수 켠 설정도 컴파일 통과.
 - Supabase 쪽: 기기 키로 `readings`·`nodes` 쓰기 권한과 열 이름 일치, Realtime 알림(명령 넣고 0.1~0.5초)을 노트북에서 확인 (`node supabase/check.mjs`).
 - **실제 보드에 올려 WiFi로 붙여 본 것은 아니다** (하드웨어가 이 노트북에 없음).
