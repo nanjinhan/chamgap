@@ -127,11 +127,27 @@ static String wifiNames() {
   return s;
 }
 
+static int wifiNext = 0;   // 훑어도 못 찾을 때 차례로 바로 붙어 볼 다음 칸
+static int scanFails = 0;
+
 // 주변을 훑어 등록한 WiFi 중 가장 센 곳에 붙기 시작한다 (결과는 cloudTask 가 지켜본다).
-// 하나도 안 보이면, 지금 보이는 WiFi 이름을 알려 준다 (secrets.h 에 그대로 옮겨 적으면 된다)
+// 안 보이면 지금 보이는 WiFi 이름을 알려 주고(secrets.h 에 그대로 옮겨 적으면 된다), 그래도 포기하지 않고
+// 등록한 WiFi에 차례로 바로 붙어 본다. (2026-11-03: 다시 붙는 중에는 훑기가 실패해 "보이는 WiFi: 없음"만
+// 되풀이하며 연결 시도 없이 멈춰 있었다)
 static void wifiConnect() {
   WiFi.disconnect();
+  vTaskDelay(pdMS_TO_TICKS(100));
   int n = WiFi.scanNetworks();
+  if (n < 0 && ++scanFails >= 3) {  // 훑기가 계속 실패하면 WiFi 장치를 껐다 켠다
+    cloudLog("WiFi 훑기가 계속 실패해서 WiFi 장치를 다시 켭니다");
+    WiFi.mode(WIFI_OFF);
+    vTaskDelay(pdMS_TO_TICKS(200));
+    WiFi.mode(WIFI_STA);
+    WiFi.setSleep(false);
+    scanFails = 0;
+  } else if (n >= 0) {
+    scanFails = 0;
+  }
   int best = -1, bestRssi = -1000;
   String seen;
   int seenCount = 0;
@@ -148,13 +164,16 @@ static void wifiConnect() {
     }
   }
   WiFi.scanDelete();
-  wifiTrying = best;
   wifiReason = 0;
   if (best < 0) {
-    cloudLog("등록한 WiFi(" + wifiNames() + ")가 안 보여요. 지금 보이는 2.4GHz WiFi: " + (seenCount ? seen : String("없음")));
-    return;
+    best = wifiNext++ % wifiCount;
+    String why = n < 0 ? String("주변 WiFi 훑기 실패")
+                       : "등록한 WiFi(" + wifiNames() + ")가 안 보여요. 지금 보이는 2.4GHz WiFi: " + (seenCount ? seen : String("없음"));
+    cloudLog(why + " — " + wifiList[best].ssid + "에 바로 연결해 봅니다");
+  } else {
+    cloudLog(String("WiFi 연결 중: ") + wifiList[best].ssid + " (세기 " + bestRssi + "dBm)");
   }
-  cloudLog(String("WiFi 연결 중: ") + wifiList[best].ssid + " (세기 " + bestRssi + "dBm)");
+  wifiTrying = best;
   WiFi.begin(wifiList[best].ssid, wifiList[best].pass);
 }
 
@@ -336,6 +355,7 @@ static void cloudTask(void*) {
 
   bool timeSet = false;
   unsigned long lastTry = millis();
+  unsigned long downSince = millis();  // WiFi가 끊긴(또는 아직 못 붙은) 때
   lastReachAt = millis();
   for (;;) {
     bool up = WiFi.status() == WL_CONNECTED;
@@ -357,7 +377,7 @@ static void cloudTask(void*) {
       lastDropReason = wifiReason;
       tls.stop();
       cloudLog("WiFi 끊김 (" + wifiReasonText(wifiReason) + ") — 다시 연결하는 중 (측정·펌프 안전은 계속 동작)");
-      lastTry = millis();
+      lastTry = downSince = millis();
     }
 
     // 스스로 고치기: WiFi는 붙어 있는데 3분 넘게 Supabase에 못 닿으면 WiFi를 다시 연결,
@@ -374,6 +394,8 @@ static void cloudTask(void*) {
     }
 
     if (!up) {
+      // 10분 넘게 WiFi에 못 붙으면 재시작으로 WiFi 장치를 처음부터 다시 켠다 (펌프가 꺼져 있을 때만)
+      if (millis() - downSince > 600000UL) needRestart = true;
       if (millis() - lastTry > 15000) {  // 15초마다 다시 훑어서 붙는다 (장소를 옮겨도 된다)
         lastTry = millis();
         if (wifiTrying >= 0) cloudLog(String("WiFi ") + wifiList[wifiTrying].ssid + " 연결 실패: " + wifiReasonText(wifiReason));
