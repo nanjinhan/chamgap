@@ -1,8 +1,9 @@
 import { useState, type ComponentType } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { IconAlert, IconChart, IconDrop, IconHome, IconStopSquare, IconTerminal } from '@/components/icons'
-import { api } from '@/lib/api'
+import { stopAll as sendStopAll } from '@/lib/commands'
 import { cn } from '@/lib/utils'
+import { useAppStore } from '@/store/useAppStore'
 import { toast } from '@/store/useToasts'
 
 type Item = { to: string; label: string; icon: ComponentType<{ size?: number }>; match: (p: string) => boolean }
@@ -23,16 +24,21 @@ export function BottomBar() {
   const { pathname } = useLocation()
   const [busy, setBusy] = useState(false)
 
+  // 넣자마자 알리고, 각 구역의 결과는 따로 기다려 문제가 있을 때만 다시 알린다
   const stopAll = async () => {
     if (busy) return
     setBusy(true)
     try {
-      const r = await api.stopAll()
-      const failed = Object.entries(r.results).filter(([, v]) => !v.ok)
-      if (failed.length === 0) toast.ok('모든 구역에 정지를 보냈어요')
-      else toast.error('정지가 안 된 구역이 있어요', failed.map(([k, v]) => `${k}: ${v.message ?? ''}`).join(' · '))
-    } catch {
-      // 오류 알림은 api가 띄운다
+      const r = await sendStopAll(Object.keys(useAppStore.getState().nodes))
+      if (!r.sent) {
+        toast.error(r.message)
+        return
+      }
+      toast.ok(r.message)
+      void r.results.then((list) => {
+        const failed = list.filter((x) => !x.ok)
+        if (failed.length) toast.error('정지가 확인되지 않은 구역이 있어요', failed.map((x) => x.message).join(' · '))
+      })
     } finally {
       setBusy(false)
     }

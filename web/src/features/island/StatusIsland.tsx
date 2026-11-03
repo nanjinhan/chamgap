@@ -9,6 +9,7 @@ import { useAppStore } from '@/store/useAppStore'
 export function StatusIsland() {
   const conn = useAppStore((s) => s.conn)
   const everOpened = useAppStore((s) => s.everOpened)
+  const configError = useAppStore((s) => s.configError)
   const summary = useAppStore(
     useShallow((s) => {
       const nodes = Object.values(s.nodes)
@@ -30,8 +31,10 @@ export function StatusIsland() {
 
   let left: { dot: string; text: string }
   let right: { dot: string; text: string } | null = null
-  if (conn !== 'open' && everOpened) {
-    left = { dot: 'bg-fault-dot', text: '서버 끊김 · 다시 연결 중' }
+  if (configError) {
+    left = { dot: 'bg-fault-dot', text: 'Supabase 설정 없음' }
+  } else if (conn !== 'open' && everOpened) {
+    left = { dot: 'bg-fault-dot', text: '연결 끊김 · 다시 연결 중' }
   } else if (conn !== 'open') {
     left = { dot: 'bg-offline', text: '연결하는 중…' }
   } else if (summary.pumping) {

@@ -24,7 +24,7 @@ function HomeHeader() {
   const s = useAppStore(
     useShallow((st) => {
       const nodes = Object.values(st.nodes)
-      const sensors = nodes.flatMap((n) => Object.values(n.sensors))
+      const sensors = nodes.flatMap((n) => Object.values(n.sensors).filter((x) => x.present)) // 단 센서만
       const issues = nodes.filter((n) => n.online).flatMap((n) => n.diagnostics).length
       const last =
         nodes
@@ -32,7 +32,9 @@ function HomeHeader() {
           .filter((x): x is string => !!x)
           .sort()
           .at(-1) ?? null
-      return { total: sensors.length, ok: sensors.filter((x) => x.status === 'ok').length, issues, last }
+      // '정보'(보정 전 등)는 문제가 아니므로 정상으로 센다
+      const ok = sensors.filter((x) => x.status === 'ok' || x.status === 'info').length
+      return { total: sensors.length, ok, issues, last }
     }),
   )
   return (
@@ -67,11 +69,14 @@ function ZoneSensors({ id }: { id: NodeId }) {
   const st = node.sensors
   const info = node.info
   // 펌웨어가 info에 알려 주는 '달린 센서' (없으면 고장이 아니라 미설치)
-  const absent = (key: string) => info?.[key] === 0 || info?.[key] === false
-  const sensorA = typeof info?.sensor_a === 'string' && info.sensor_a !== 'SHT31' ? info.sensor_a : null
+  const absent = (key: keyof typeof st) => !st[key].present
+  const soilB = st.soil_b.present
+  const sensorA =
+    typeof info?.sensor_a === 'string' && info.sensor_a !== 'SHT31' && info.sensor_a !== 'none' ? info.sensor_a : null
   const raw = typeof d?.weight_raw === 'number' ? d.weight_raw : null
   const dT = typeof d?.temp_b === 'number' && typeof d?.temp_a === 'number' ? d.temp_b - d.temp_a : null
   const power = st.power.status
+  const pumpAbsent = !st.pump.present
   const pumpStatus = worst(st.pump.status, power)
   const limit = typeof node.info?.day_limit_ml === 'number' ? node.info.day_limit_ml : 300
   const pumpTitle = node.pump.on
@@ -103,7 +108,7 @@ function ZoneSensors({ id }: { id: NodeId }) {
           role={sensorA ? `대상 · ${sensorA}` : '대상'}
           value={`${n1(d?.temp_a)}°C · ${n1(d?.rh_a)}%`}
           stale={stale}
-          absent={absent('sht_a_present')}
+          absent={absent('sht_a')}
         />
         <SensorTile
           to={`/zone/${id}/sensor/sht_b`}
@@ -112,20 +117,21 @@ function ZoneSensors({ id }: { id: NodeId }) {
           title="온습도 B"
           role="비교"
           value={
-            absent('sht_b_present')
+            absent('sht_b')
               ? '아직 연결 안 함'
               : `${n1(d?.temp_b)}°C · A와 ${dT == null ? '--' : `${dT >= 0 ? '+' : ''}${dT.toFixed(1)}°C`}`
           }
           stale={stale}
-          absent={absent('sht_b_present')}
+          absent={absent('sht_b')}
         />
         <SensorTile
           to={`/zone/${id}/sensor/soil_a`}
           status={worst(st.soil_a.status, st.soil_b.status)}
           icon={<IconDrop size={18} />}
-          title="토양 A · B"
-          value={`${n2(d?.soil_a)} · ${n2(d?.soil_b)}`}
+          title={soilB ? '토양 A · B' : '토양 A'}
+          value={soilB ? `${n2(d?.soil_a)} · ${n2(d?.soil_b)}` : `${n2(d?.soil_a)} · ${d?.soil_a_mv ?? '--'}mV`}
           stale={stale}
+          absent={absent('soil_a') && !soilB}
         />
         <SensorTile
           to={`/zone/${id}/sensor/scale`}
@@ -140,25 +146,31 @@ function ZoneSensors({ id }: { id: NodeId }) {
                 : '-- g'
           }
           stale={stale}
-          absent={absent('hx_present')}
+          absent={absent('scale')}
         />
         <Link
           to={`/water/${id}`}
-          className={cn('card col-span-2 flex items-center gap-3 px-3 py-[11px]', OUTLINE[pumpStatus])}
+          className={cn('card col-span-2 flex items-center gap-3 px-3 py-[11px]', !pumpAbsent && OUTLINE[pumpStatus])}
         >
-          <IconCircle status={pumpStatus}>
+          <IconCircle status={pumpAbsent ? 'offline' : pumpStatus}>
             <IconPump size={18} />
           </IconCircle>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 text-[13px] font-bold">
-              {pumpTitle}
-              {pumpStatus !== 'ok' ? <StatusText status={pumpStatus} /> : null}
+              {pumpAbsent ? '펌프' : pumpTitle}
+              {pumpAbsent ? (
+                <span className="text-[11px] font-bold text-offline">미설치</span>
+              ) : pumpStatus !== 'ok' ? (
+                <StatusText status={pumpStatus} />
+              ) : null}
             </div>
             <div className="num text-[12px] text-ink-2">
-              {last} · 오늘 {Math.round(node.pump.today_ml)}/{limit}mL
+              {pumpAbsent ? '아직 연결 안 함' : `${last} · 오늘 ${Math.round(node.pump.today_ml)}/${limit}mL`}
             </div>
           </div>
-          <span className="rounded-full bg-brand px-3 py-1.5 text-[12px] font-bold text-white">급수</span>
+          {pumpAbsent ? null : (
+            <span className="rounded-full bg-brand px-3 py-1.5 text-[12px] font-bold text-white">급수</span>
+          )}
         </Link>
       </div>
     </section>
@@ -169,6 +181,7 @@ export default function HomePage() {
   const ids = useNodeIds()
   const conn = useAppStore((s) => s.conn)
   const everOpened = useAppStore((s) => s.everOpened)
+  const configError = useAppStore((s) => s.configError)
   const [index, setIndex] = useState(0)
 
   if (ids.length === 0) {
@@ -176,8 +189,13 @@ export default function HomePage() {
       <>
         <HomeHeader />
         <div className="card mt-6 px-4 py-5 text-center">
-          {!everOpened || conn === 'connecting' ? (
-            <p className="text-[14px] font-bold">서버에 연결하는 중…</p>
+          {configError ? (
+            <>
+              <p className="text-[14px] font-bold">Supabase 설정이 없어요</p>
+              <p className="mt-1 text-[12px] text-ink-2">{configError}</p>
+            </>
+          ) : !everOpened || conn === 'connecting' ? (
+            <p className="text-[14px] font-bold">연결하는 중…</p>
           ) : (
             <>
               <p className="text-[14px] font-bold">아직 ESP32 신호가 없어요</p>

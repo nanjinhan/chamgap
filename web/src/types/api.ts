@@ -1,6 +1,6 @@
 /**
- * 서버와 주고받는 형식 (요구사항지시서 4.2 메시지, 5.3 상태, 6.2 진단).
- * 서버는 키를 더 보낼 수 있으므로 [key: string]: unknown 을 허용한다 (COM-09).
+ * 데이터 형식 (요구사항지시서 v2.0 4.2 메시지, 4.4 Supabase 표, 6.2 진단).
+ * ESP32가 키를 더 보낼 수 있으므로 [key: string]: unknown 을 허용한다 (COM-09).
  */
 
 export type NodeId = string
@@ -12,40 +12,120 @@ export const SENSOR_KEYS: SensorKey[] = ['sht_a', 'sht_b', 'soil_a', 'soil_b', '
 type Extra = { [key: string]: unknown }
 type Bit = 0 | 1
 
+// ------------------------------------------------------------ Supabase 표의 행 (supabase/schema.sql)
+
+/** readings: 주기 측정값 한 줄 (열 이름 = data 메시지 키) */
+export interface ReadingRow {
+  id: number
+  created_at: string
+  node: NodeId
+  ms: number | null
+  seq: number | null
+  sht_a_ok: Bit | null
+  temp_a: number | null
+  rh_a: number | null
+  sht_b_ok: Bit | null
+  temp_b: number | null
+  rh_b: number | null
+  soil_a_mv: number | null
+  soil_a: number | null
+  soil_b_mv: number | null
+  soil_b: number | null
+  hx_ok: Bit | null
+  weight_g: number | null
+  weight_sd: number | null
+  weight_raw: number | null
+  v12: number | null
+  leak: Bit | null
+  pump: Bit | null
+  rssi: number | null
+  extra: Extra | null
+}
+
+/** nodes: 구역별 마지막 설정·상태 (ESP32가 upsert) */
+export interface NodeRow {
+  node: NodeId
+  updated_at: string
+  last_seen: string | null
+  fw: string | null
+  info: InfoMsg | null
+  pump: Bit
+  day_ml: number
+}
+
+/** events: ESP32의 evt·info, 웹의 메모, 진단 서버의 diag_on/off·water_result */
+export interface EventRow {
+  id: number
+  created_at: string
+  node: NodeId | null
+  t: 'evt' | 'info' | 'mark' | 'diag_on' | 'diag_off' | 'water_result'
+  ev: string | null
+  payload: Extra
+}
+
+export type CommandStatus = 'pending' | 'sent' | 'done' | 'failed' | 'expired'
+
+/** commands: 웹이 넣고 ESP32가 결과를 적는다 */
+export interface CommandRow {
+  id: number
+  created_at: string
+  node: NodeId
+  cmd: string
+  status: CommandStatus
+  picked_at: string | null
+  done_at: string | null
+  result: AckMsg | null
+}
+
+// ------------------------------------------------------------ ESP32 메시지 (4.2)
+
 interface Base extends Extra {
   t: string
   node?: string
   ms?: number | null
-  pc_time: string
-  src: string
+  /** Supabase가 붙인 시각 (COM-08) */
+  created_at: string
 }
 
 /** 주기 측정값 (4.2 data) */
 export interface DataMsg extends Base {
   t: 'data'
   node: string
-  seq?: number
-  sht_a_ok?: Bit
+  seq?: number | null
+  sht_a_ok?: Bit | null
   temp_a?: number | null
   rh_a?: number | null
-  sht_b_ok?: Bit
+  sht_b_ok?: Bit | null
   temp_b?: number | null
   rh_b?: number | null
   soil_a_mv?: number | null
   soil_a?: number | null
   soil_b_mv?: number | null
   soil_b?: number | null
-  hx_ok?: Bit
+  hx_ok?: Bit | null
   weight_g?: number | null
   weight_sd?: number | null
+  weight_raw?: number | null
   v12?: number | null
   leak?: Bit | null
-  pump?: Bit
+  pump?: Bit | null
   rssi?: number | null
 }
 
 export type PumpReason =
-  'done' | 'stop' | 'no_12v' | 'leak' | 'reboot' | 'already_on' | 'bad_ms' | 'cooldown' | (string & {})
+  | 'done'
+  | 'stop'
+  | 'no_12v'
+  | 'leak'
+  | 'reboot'
+  | 'already_on'
+  | 'bad_ms'
+  | 'cooldown'
+  | 'bad_ml'
+  | 'daily_limit'
+  | 'flow_uncal'
+  | 'scale_dead'
+  | (string & {})
 
 /** 사건 (4.2 evt) */
 export interface EvtMsg extends Base {
@@ -59,20 +139,24 @@ export interface EvtMsg extends Base {
   reset?: number
 }
 
-/** 명령 응답 (4.2 ack) */
-export interface AckMsg extends Base {
-  t: 'ack'
+/** 명령 응답 (4.2 ack). commands.result 에 들어간다 */
+export interface AckMsg extends Extra {
+  t?: 'ack'
+  node?: string
+  ms?: number
   cmd: string
   ok: Bit
   msg: string
 }
 
-/** 설정·보정 상태 (4.2 info) */
-export interface InfoMsg extends Base {
-  t: 'info'
+/** 설정·보정 상태 (4.2 info). nodes.info 에 들어간다 */
+export interface InfoMsg extends Extra {
+  t?: 'info'
   fw?: string
   sample_ms?: number
   soil_cal?: Bit
+  soil_a_cal?: Bit
+  soil_b_cal?: Bit
   soil_a_air?: number
   soil_a_wet?: number
   soil_b_air?: number
@@ -83,15 +167,21 @@ export interface InfoMsg extends Base {
   pump_mlps?: number
   v12_sense?: Bit
   leak_sensor?: Bit
-  mqtt?: Bit
+  cloud?: Bit
+  day_ml?: number
+  day_limit_ml?: number
+  max_ml?: number
+  sensor_a?: string
+  sht_a_present?: Bit
+  sht_b_present?: Bit
+  soil_a_present?: Bit
+  soil_b_present?: Bit
+  hx_present?: Bit
+  pump_present?: Bit
 }
 
-/** 시험 스케치 메시지 (node 없음) */
-export interface TestMsg extends Base {
-  t: string
-}
+// ------------------------------------------------------------ 진단 (6.2, 진단 서버가 diagnostics 표에 쓴다)
 
-/** 진단 (6.2) */
 export interface Diagnostic {
   code: string
   node: NodeId
@@ -103,8 +193,10 @@ export interface Diagnostic {
   checks: string[]
   since: string
   action?: { label: string; to: string } | null
-  values?: Record<string, unknown>
+  values?: Record<string, unknown> | null
 }
+
+// ------------------------------------------------------------ 화면이 쓰는 구역 상태 (Supabase 행에서 만든다)
 
 export interface PumpState {
   on: boolean
@@ -118,13 +210,12 @@ export interface PumpState {
 
 export interface SensorState {
   status: Severity
-  value: unknown
+  /** 이 보드에 달려 있는지 (info의 *_present). 모르면 true */
+  present: boolean
 }
 
-/** 구역 상태 (5.3) */
 export interface NodeState {
   node: NodeId
-  src: string | null
   online: boolean
   last_seen: string | null
   status: Severity
@@ -135,39 +226,7 @@ export interface NodeState {
   diagnostics: Diagnostic[]
 }
 
-export interface LinkPort {
-  port: string
-  connected: boolean
-  node?: string | null
-  error?: string | null
-  hint?: string | null
-  desc?: string
-  scenario?: string
-}
-
-export interface LinkStatus extends Extra {
-  mode: 'serial' | 'mqtt' | 'mock'
-  ports: LinkPort[]
-  server_time: string
-  mock: boolean
-  allow_raw: boolean
-  pin_required: boolean
-  urls?: string[]
-  scenarios?: string[]
-  speed?: number
-  broker?: string
-  connected?: boolean
-  error?: string | null
-  hint?: string | null
-}
-
-export interface AppState {
-  server_time: string
-  link: LinkStatus
-  nodes: Record<NodeId, NodeState>
-}
-
-/** 서버가 만든 사건 (WebSocket evt의 payload.t) */
+/** 진단 서버가 만든 급수 결과 사건 (events.t = water_result) */
 export interface WaterResult extends Extra {
   t: 'water_result'
   node: NodeId
@@ -178,69 +237,6 @@ export interface WaterResult extends Extra {
   delta_g?: number | null
   verdict?: 'ok' | 'not_arrived' | 'over' | 'unknown' | 'skipped'
   reason?: string | null
-}
-
-export interface MarkItem extends Extra {
-  t: 'mark'
-  node: NodeId | null
-  note: string
-  pc_time: string
-}
-
-export interface LogPayload {
-  src: string | null
-  text: string
-  pc_time: string
-  note: boolean
-  bad_json: boolean
-  dir: 'rx' | 'tx'
-  sent?: boolean
-}
-
-type WsBase = { server_time?: string }
-
-export type WsMessage =
-  | (WsBase & { type: 'snapshot'; state: AppState })
-  | (WsBase & { type: 'data'; node: NodeId; payload: DataMsg; online?: boolean; last_seen?: string })
-  | (WsBase & {
-      type: 'evt'
-      node: NodeId | null
-      payload: EvtMsg | WaterResult | MarkItem | InfoMsg
-      pump?: PumpState
-      info?: InfoMsg
-    })
-  | (WsBase & { type: 'ack'; node: NodeId; payload: AckMsg })
-  | (WsBase & {
-      type: 'diag'
-      node: NodeId
-      payload: { diagnostics: Diagnostic[]; status: Severity; sensors: Record<SensorKey, SensorState>; online: boolean }
-    })
-  | (WsBase & { type: 'link'; node: NodeId | null; payload: { event: string; link: LinkStatus } & Extra })
-  | (WsBase & { type: 'log'; node: NodeId | null; payload: LogPayload })
-  | (WsBase & { type: 'test'; node: null; payload: TestMsg })
-  | (WsBase & { type: 'ping' })
-
-export interface PreflightCheck {
-  key: string
-  ok: boolean
-  label_ko: string
-  detail_ko: string
-}
-
-export interface Preflight {
-  ok: boolean
-  error: string | null
-  message: string | null
-  checks: PreflightCheck[]
-}
-
-export interface EventItem {
-  id: number
-  node: NodeId | null
-  ts: number
-  time: string
-  kind: 'evt' | 'ack' | 'info' | 'diag_on' | 'diag_off' | 'command' | 'mark' | 'water_result' | 'link' | (string & {})
-  payload: Record<string, unknown>
 }
 
 export type Metric =
@@ -255,35 +251,3 @@ export type Metric =
   | 'weight_g'
   | 'weight_sd'
   | 'v12'
-
-export interface HistoryPoint extends Partial<Record<Metric, number | null>> {
-  ts: number
-  t: string
-}
-
-export interface HistoryResponse {
-  ok: true
-  node: NodeId
-  metrics: Metric[]
-  minutes: number
-  bucket: number
-  points: HistoryPoint[]
-}
-
-export interface FlowCalResult {
-  ok: true
-  ms: number
-  ran: number | null
-  reason: string | null
-  before_g: number | null
-  after_g: number | null
-  delta_g: number | null
-}
-
-export interface ApiErrorBody {
-  ok: false
-  error: string
-  message: string
-  checks?: PreflightCheck[]
-  ack?: AckMsg | null
-}

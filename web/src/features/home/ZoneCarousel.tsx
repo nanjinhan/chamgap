@@ -30,7 +30,7 @@ function ZoneCard({ id }: { id: NodeId }) {
   const [photo, setPhoto] = useState(true)
   if (!node) return null
   const d = node.latest
-  const connected = Object.values(node.sensors).filter((s) => s.status !== 'offline').length
+  const connected = Object.values(node.sensors).filter((s) => s.present && s.status !== 'offline').length
   const sub = node.online
     ? `센서 ${connected}개 연결 · ${node.pump.on ? '급수 중' : '펌프 대기'}`
     : `연결 끊김 · 마지막 값 ${ago}`
