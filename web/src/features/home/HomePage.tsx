@@ -23,9 +23,17 @@ type Metric = {
 }
 
 /** 사진 위 측정값 하나 (디자인 01: 이름 · 큰 숫자 · 범위 막대 · 양 끝 값) */
-function MetricBlock({ m, dim, className }: { m: Metric; dim: boolean; className: string }) {
+function MetricBlock({ m, dim, className, to }: { m: Metric; dim: boolean; className: string; to: string }) {
   return (
-    <div className={cn('absolute w-[25%] min-w-[88px]', className)} style={{ textShadow: 'var(--ds-shadow-text)' }}>
+    <Link
+      to={to}
+      aria-label={`${m.label} ${m.value} 자세히 보기`}
+      className={cn(
+        'absolute block w-[25%] min-w-[88px] rounded-[10px] transition-opacity active:opacity-70',
+        className,
+      )}
+      style={{ textShadow: 'var(--ds-shadow-text)' }}
+    >
       <div className="text-[11.5px] text-ds-text-2">{m.label}</div>
       <div className={cn('num mt-0.5 text-[29px] leading-[1.1] font-light tracking-[-0.01em]', dim && 'opacity-55')}>
         {m.value}
@@ -47,7 +55,7 @@ function MetricBlock({ m, dim, className }: { m: Metric; dim: boolean; className
           </>
         )}
       </div>
-    </div>
+    </Link>
   )
 }
 
@@ -100,10 +108,20 @@ function Hero({ id }: { id: NodeId }) {
   return (
     <div className="relative -mx-[26px] aspect-[670/600] lg:mx-0 lg:mt-6">
       <img src="/design/home-hero.jpg" alt="" className="hero-fade absolute inset-0 size-full object-cover" />
-      <MetricBlock m={m.temp} dim={dim} className="top-[15.5%] left-[26px] lg:left-[5%]" />
-      <MetricBlock m={m.rh} dim={dim} className="top-[39.5%] left-[26px] lg:left-[5%]" />
-      <MetricBlock m={m.soil} dim={dim} className="top-[5.5%] left-[79.5%]" />
-      <MetricBlock m={m.weight} dim={dim} className="top-[35.5%] left-[79.5%]" />
+      <MetricBlock
+        m={m.temp}
+        dim={dim}
+        to={`/zone/${id}/sensor/climate`}
+        className="top-[15.5%] left-[26px] lg:left-[5%]"
+      />
+      <MetricBlock
+        m={m.rh}
+        dim={dim}
+        to={`/zone/${id}/sensor/climate`}
+        className="top-[39.5%] left-[26px] lg:left-[5%]"
+      />
+      <MetricBlock m={m.soil} dim={dim} to={`/zone/${id}/sensor/soil`} className="top-[5.5%] left-[79.5%]" />
+      <MetricBlock m={m.weight} dim={dim} to={`/zone/${id}/sensor/weight`} className="top-[35.5%] left-[79.5%]" />
     </div>
   )
 }
@@ -251,8 +269,14 @@ export default function HomePage() {
         style={{ textShadow: 'var(--ds-shadow-text)' }}
       >
         <h1 className="font-light tracking-[-0.025em]">
-          <span className="block text-[70px] leading-[0.95] lg:text-[104px]">{active}</span>
-          <span className="mt-[6px] block text-[61px] leading-[1.05] lg:text-[88px]">{p.name}</span>
+          <Link
+            to={`/zone/${active}`}
+            aria-label={`${active} ${p.name} 구역 상세 보기`}
+            className="block active:opacity-70"
+          >
+            <span className="block text-[70px] leading-[0.95] lg:text-[104px]">{active}</span>
+            <span className="mt-[6px] block text-[61px] leading-[1.05] lg:text-[88px]">{p.name}</span>
+          </Link>
         </h1>
         <p
           className={cn(
@@ -261,6 +285,12 @@ export default function HomePage() {
           )}
         >
           {sub}
+          <Link
+            to={`/zone/${active}`}
+            className="ml-2 inline-flex items-center text-white/90 underline-offset-2 hover:underline"
+          >
+            상세 보기 ›
+          </Link>
         </p>
       </section>
       <div className="lg:col-start-2 lg:row-span-3 lg:row-start-1 lg:self-center">
