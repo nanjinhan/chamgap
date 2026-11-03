@@ -17,7 +17,7 @@ const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'))
 const FxDemoPage = import.meta.env.DEV ? lazy(() => import('@/features/dev/FxDemoPage')) : null
 
 function Page({ children }: { children: ReactNode }) {
-  return <Suspense fallback={<div className="caption p-4">불러오는 중…</div>}>{children}</Suspense>
+  return <Suspense fallback={<div className="p-4 text-[13px] text-ds-text-2">불러오는 중…</div>}>{children}</Suspense>
 }
 
 function CalibrateDefault() {

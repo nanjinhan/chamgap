@@ -33,7 +33,15 @@
 
   /* ===== 새 디자인 (design/*.jpg, 2026-11-03): 회색·초록 사진 배경 위 유리 카드, 연두 포인트, 흰 글자 ===== */
   --ds-bg-home: linear-gradient(180deg, #5d6b74 0%, #6b7982 16%, #83919a 36%, #9ca7aa 60%, #a9aca6 100%);
-  --ds-bg-sub: linear-gradient(180deg, #56625f 0%, #3a4642 42%, #29332f 100%);
+  --ds-bg-sub: linear-gradient(180deg, #737b77 0%, #59625f 26%, #434d4b 55%, #2d3635 82%, #252d2c 100%);
+  --ds-panel: rgba(30, 37, 35, 0.42); /* 하위 화면 카드 */
+  --ds-panel-2: rgba(16, 22, 21, 0.32); /* 카드 안 칸 */
+  --ds-panel-line: rgba(255, 255, 255, 0.1);
+  --ds-green: #6e9a52; /* 고른 탭 */
+  --ds-chart: #b6dc76; /* 그래프 A 센서 */
+  --ds-chart-b: #f2f2ee; /* 그래프 B 센서 */
+  --ds-btn-lime: #c7e88f; /* 큰 연두 버튼 */
+  --ds-btn-lime-ink: #2f3d18;
   --ds-text: #ffffff;
   --ds-text-2: rgba(255, 255, 255, 0.8);
   --ds-text-3: rgba(255, 255, 255, 0.6);

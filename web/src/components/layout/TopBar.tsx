@@ -60,7 +60,7 @@ export function TopBar() {
 
   return (
     <header className="relative z-30" style={{ paddingTop: 'calc(var(--safe-top) + 16px)' }}>
-      <div className="flex h-[38px] items-center justify-between">
+      <div className={`flex h-[38px] items-center justify-between ${home ? '' : 'px-1'}`}>
         <div className="flex items-center gap-3">
           {home ? null : (
             <button

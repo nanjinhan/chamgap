@@ -48,7 +48,7 @@ export function MenuSheet({ onClose }: { onClose: () => void }) {
       className="fixed inset-0 z-50 bg-[#1f2824]/80 backdrop-blur-xl"
       style={{ paddingTop: 'calc(var(--safe-top) + 16px)' }}
     >
-      <div className="mx-auto flex h-full max-w-[430px] flex-col px-[26px] pb-8">
+      <div className="mx-auto flex h-full max-w-[430px] flex-col px-[26px] pb-8 lg:max-w-[1160px] lg:px-12">
         <div className="flex h-[38px] items-center justify-between">
           <span className="text-[15px] tracking-[0.04em]">CHAMGAP</span>
           <button

@@ -27,6 +27,15 @@
 }
 
 @layer components {
+  /* 홈 큰 사진 가장자리 (폰: 위아래만 흐리게, 넓은 화면: 사방을 흐리게) */
+  .hero-fade {
+    mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 86%, transparent 100%);
+  }
+  @media (min-width: 1024px) {
+    .hero-fade {
+      mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 62%, transparent 100%);
+    }
+  }
   /* 흰 둥근 카드 */
   .card {
     background: var(--surface);

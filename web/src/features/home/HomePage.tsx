@@ -101,17 +101,11 @@ function Hero({ id }: { id: NodeId }) {
   const { stale } = useFreshness(node?.last_seen)
   const m = metrics(node)
   const dim = stale || !node?.online
-  const fade = 'linear-gradient(to bottom, transparent 0, #000 9%, #000 86%, transparent 100%)'
   return (
-    <div className="relative -mx-[26px] aspect-[670/600]">
-      <img
-        src="/design/home-hero.jpg"
-        alt=""
-        className="absolute inset-0 size-full object-cover"
-        style={{ maskImage: fade, WebkitMaskImage: fade }}
-      />
-      <MetricBlock m={m.temp} dim={dim} className="top-[15.5%] left-[26px]" />
-      <MetricBlock m={m.rh} dim={dim} className="top-[39.5%] left-[26px]" />
+    <div className="relative -mx-[26px] aspect-[670/600] lg:mx-0 lg:mt-6">
+      <img src="/design/home-hero.jpg" alt="" className="hero-fade absolute inset-0 size-full object-cover" />
+      <MetricBlock m={m.temp} dim={dim} className="top-[15.5%] left-[26px] lg:left-[5%]" />
+      <MetricBlock m={m.rh} dim={dim} className="top-[39.5%] left-[26px] lg:left-[5%]" />
       <MetricBlock m={m.soil} dim={dim} className="top-[5.5%] left-[79.5%]" />
       <MetricBlock m={m.weight} dim={dim} className="top-[35.5%] left-[79.5%]" />
     </div>
@@ -123,7 +117,7 @@ function ZoneDock({ ids, active, onPick }: { ids: NodeId[]; active: NodeId; onPi
   const navigate = useNavigate()
   const nodes = useAppStore((s) => s.nodes)
   return (
-    <div className="relative -mt-[22px] flex items-start justify-between px-1">
+    <div className="relative -mt-[22px] flex items-start justify-between px-1 lg:mt-10 lg:max-w-[440px]">
       {ids.slice(0, 3).map((id) => {
         const p = zoneProfile(id)
         const on = id === active
@@ -204,7 +198,7 @@ function WaterCard({ id }: { id: NodeId }) {
   return (
     <section
       aria-label="오늘 급수량"
-      className="-mx-5 mt-[18px] flex items-center justify-between gap-3 rounded-[34px] border border-white/35 bg-[var(--ds-glass-light)] py-[18px] pr-[14px] pl-[24px] backdrop-blur-xl"
+      className="-mx-5 mt-[18px] flex lg:mx-0 lg:mt-8 lg:max-w-[460px] items-center justify-between gap-3 rounded-[34px] border border-white/35 bg-[var(--ds-glass-light)] py-[18px] pr-[14px] pl-[24px] backdrop-blur-xl"
       style={{ textShadow: 'var(--ds-shadow-text)' }}
     >
       <div className="min-w-0 flex-1">
@@ -255,11 +249,14 @@ export default function HomePage() {
         : `연결 끊김 · 마지막 값 ${ago}`
 
   return (
-    <>
-      <section className="mt-[30px]" style={{ textShadow: 'var(--ds-shadow-text)' }}>
+    <div className="lg:grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:grid-rows-[auto_auto_1fr] lg:gap-x-12">
+      <section
+        className="mt-[30px] lg:col-start-1 lg:row-start-1 lg:mt-16"
+        style={{ textShadow: 'var(--ds-shadow-text)' }}
+      >
         <h1 className="font-light tracking-[-0.025em]">
-          <span className="block text-[70px] leading-[0.95]">{active}</span>
-          <span className="mt-[6px] block text-[61px] leading-[1.05]">{p.name}</span>
+          <span className="block text-[70px] leading-[0.95] lg:text-[104px]">{active}</span>
+          <span className="mt-[6px] block text-[61px] leading-[1.05] lg:text-[88px]">{p.name}</span>
         </h1>
         <p
           className={cn(
@@ -270,9 +267,15 @@ export default function HomePage() {
           {sub}
         </p>
       </section>
-      <Hero id={active} />
-      <ZoneDock ids={ids} active={active} onPick={setPicked} />
-      <WaterCard id={active} />
-    </>
+      <div className="lg:col-start-2 lg:row-span-3 lg:row-start-1 lg:self-center">
+        <Hero id={active} />
+      </div>
+      <div className="lg:col-start-1 lg:row-start-2">
+        <ZoneDock ids={ids} active={active} onPick={setPicked} />
+      </div>
+      <div className="lg:col-start-1 lg:row-start-3">
+        <WaterCard id={active} />
+      </div>
+    </div>
   )
 }
